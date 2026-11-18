@@ -6,11 +6,14 @@ Discoverable Tools and lets the platform push SEO changes back.
 ## Setup (on your machine)
 ```bash
 npm install
-npx shopify app config link      # pick/create the app in the Partner Dashboard (distribution: Custom)
-cp .env.example .env             # DISCO_TOOLS_API_URL / DISCO_TOOLS_API_SECRET
-npm run dev                      # tunnel + install on a dev store
-npm run deploy                   # push scopes/webhooks config
+npx shopify app config link
+cp .env.example .env
+npm run dev
+npm run deploy
 ```
+`config link` picks or creates the app (distribution: Custom). Edit `.env` to set the platform URL and secret.
+`npm run dev` starts the tunnel and installs on a dev store; `npm run deploy` pushes scopes and webhook config.
+
 In the Partner Dashboard: choose **Custom distribution**, generate an install link per client store,
 and request **Protected customer data** access (needed for customers/orders PII).
 
