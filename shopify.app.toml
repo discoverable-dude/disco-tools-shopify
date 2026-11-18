@@ -1,0 +1,41 @@
+# Discoverable Connector - custom distribution app.
+# Run `shopify app config link` to fill in client_id from the Partner Dashboard.
+client_id = ""
+name = "Discoverable Connector"
+application_url = "https://example.com"
+embedded = true
+
+[access_scopes]
+# Customer/order PII fields need Protected Customer Data approval in the Partner Dashboard.
+scopes = "read_products,write_products,read_orders,read_customers,read_inventory,read_content,write_content,read_online_store_navigation,read_markets"
+
+[auth]
+redirect_urls = ["https://example.com/auth/callback"]
+
+[webhooks]
+api_version = "2026-10"
+
+  # All business topics are handled by /app/routes/webhooks.tsx, which verifies,
+  # records in an outbox and forwards to Discoverable Tools.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks"
+  topics = [
+    "app/uninstalled",
+    "app/scopes_update",
+    "products/create",
+    "products/update",
+    "products/delete",
+    "collections/create",
+    "collections/update",
+    "collections/delete",
+    "orders/create",
+    "orders/updated",
+    "customers/create",
+    "customers/update",
+    "inventory_levels/update",
+    "bulk_operations/finish"
+  ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks"
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
