@@ -28,10 +28,12 @@ and request **Protected customer data** access (needed for customers/orders PII)
 | Admin dashboard (connection, sync, webhook health, pushes) | `app/routes/app._index.tsx` |
 
 ## Platform contract (all requests HMAC-SHA256 signed: `x-disco-timestamp`, `x-disco-signature` over `${ts}.${body}`)
-App -> platform: `POST /api/shopify/events`, `POST /api/shopify/sync`, `GET /api/shopify/health`.
+App -> platform (edge functions under DISCO_TOOLS_API_URL): `POST /shopify-events`, `POST /shopify-sync`, `GET /shopify-health`.
 Platform -> app: `POST /api/push/seo`, `POST /api/sync`.
 
 ## Before production
 - Switch Prisma to Postgres and re-create migrations; host somewhere long-running (the bulk download runs after the webhook returns).
 - Schedule a call to `POST /api/sync {"retry":true}` every few minutes to flush the outbox.
 - Customer/order fields are kept minimal until Protected Customer Data is approved.
+
+Full platform build instructions (paste-ready for Lovable): `docs/PLATFORM_INTEGRATION.md`.

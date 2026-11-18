@@ -6,6 +6,7 @@ import db from "../db.server";
 import { platformHealth } from "../platform.server";
 import { retryPending } from "../outbox.server";
 import { startSync, type Resource } from "../sync.server";
+import { getOrderInsights, getSeoAudit } from "../insights.server";
 
 const RESOURCES: Resource[] = ["products", "orders", "customers"];
 const since = () => new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -30,6 +31,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ]);
   const data = (await shopRes.json()).data;
 
+  // Each insight is isolated so a missing scope or schema change only blanks its own card.
+  const safe = async <T,>(fn: () => Promise<T>): Promise<{ data: T | null; error: string | null }> => {
+    try {
+      return { data: await fn(), error: null };
+    } catch (e) {
+      return { data: null, error: (e as Error).message };
+    }
+  };
+  const [sales, seo] = await Promise.all([
+    safe(() => getOrderInsights(admin)),
+    safe(() => getSeoAudit(admin)),
+  ]);
+
   return {
     shop,
     shopInfo: data.shop,
@@ -42,6 +56,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     webhooks: { events24h, pending, failed, last: lastEvent?.receivedAt ?? null },
     runs,
     pushes,
+    sales,
+    seo,
   };
 };
 
@@ -71,6 +87,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return null;
 };
 
+const money = (n: number, currency: string) =>
+  new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+
+function Metric({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+  return (
+    <s-box padding="base" border="base" borderRadius="base" background={bad ? "subdued" : "base"}>
+      <s-stack gap="small-500">
+        <s-text>{label}</s-text>
+        <s-heading>{value}</s-heading>
+      </s-stack>
+    </s-box>
+  );
+}
+
 const fmt = (d: string | Date | null | undefined) =>
   d ? new Date(d).toLocaleString("en-GB") : "Never";
 const tone = (s: string) =>
@@ -86,6 +116,57 @@ export default function Dashboard() {
 
   return (
     <s-page heading="Discoverable Connector">
+      <s-section heading={`Sales - last ${d.sales.data?.days ?? 30} days`}>
+        {d.sales.error && <s-banner tone="critical">Could not load sales: {d.sales.error}</s-banner>}
+        {d.sales.data && (
+          <s-stack gap="base">
+            <s-grid gridTemplateColumns="repeat(4, 1fr)" gap="base">
+              <Metric label="Revenue" value={money(d.sales.data.revenue, d.sales.data.currency)} />
+              <Metric label="Orders" value={String(d.sales.data.orders)} />
+              <Metric label="Avg order value" value={money(d.sales.data.aov, d.sales.data.currency)} />
+              <Metric label="Refunded" value={money(d.sales.data.refunded, d.sales.data.currency)} />
+            </s-grid>
+            {d.sales.data.capped && <s-text>Showing the most recent 400 orders only.</s-text>}
+            <s-heading>Top products by revenue</s-heading>
+            {d.sales.data.topProducts.map((p) => (
+              <s-text key={p.title}>{p.title} · {p.units} sold · {money(p.revenue, d.sales.data!.currency)}</s-text>
+            ))}
+            <s-heading>Sales channels</s-heading>
+            {d.sales.data.channels.map((c) => (
+              <s-text key={c.name}>{c.name} · {c.orders} orders · {money(c.revenue, d.sales.data!.currency)}</s-text>
+            ))}
+            <s-text>Traffic sources, rankings and ad performance for this store live in Discoverable Tools.</s-text>
+          </s-stack>
+        )}
+      </s-section>
+
+      <s-section heading="On-page SEO health">
+        {d.seo.error && <s-banner tone="critical">Could not run SEO audit: {d.seo.error}</s-banner>}
+        {d.seo.data && (
+          <s-stack gap="base">
+            <s-text>
+              Scanned {d.seo.data.products} active products and {d.seo.data.collections} collections
+              {d.seo.data.capped ? " (first 1,000 of each)" : ""}. {d.seo.data.draftOrArchived} draft/archived products skipped.
+            </s-text>
+            <s-grid gridTemplateColumns="repeat(3, 1fr)" gap="base">
+              <Metric label="Missing meta title" value={String(d.seo.data.missingMetaTitle)} bad={d.seo.data.missingMetaTitle > 0} />
+              <Metric label="Missing meta description" value={String(d.seo.data.missingMetaDescription)} bad={d.seo.data.missingMetaDescription > 0} />
+              <Metric label="Duplicate titles" value={String(d.seo.data.duplicateTitles)} bad={d.seo.data.duplicateTitles > 0} />
+              <Metric label="Meta title over 60 chars" value={String(d.seo.data.metaTitleTooLong)} bad={d.seo.data.metaTitleTooLong > 0} />
+              <Metric label="Meta description too long/short" value={String(d.seo.data.metaDescriptionTooLong + d.seo.data.metaDescriptionTooShort)} bad={d.seo.data.metaDescriptionTooLong + d.seo.data.metaDescriptionTooShort > 0} />
+              <Metric label="Main image missing alt text" value={String(d.seo.data.missingAlt)} bad={d.seo.data.missingAlt > 0} />
+            </s-grid>
+            {d.seo.data.worst.length > 0 && <s-heading>Biggest opportunities</s-heading>}
+            {d.seo.data.worst.map((i) => (
+              <s-stack key={i.id} gap="small-500">
+                <s-link href={`shopify:admin/${i.kind === "product" ? "products" : "collections"}/${i.id.split("/").pop()}`}>{i.title}</s-link>
+                <s-text>{i.problems.join(" · ")}</s-text>
+              </s-stack>
+            ))}
+            <s-text>Fixes can be pushed from Discoverable Tools with a diff preview and one-click rollback.</s-text>
+          </s-stack>
+        )}
+      </s-section>
       <s-section heading="Connection">
         <s-stack gap="small">
           <s-stack direction="inline" gap="small">

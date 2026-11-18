@@ -7,8 +7,9 @@ import crypto from "node:crypto";
  * DISCO_TOOLS_API_SECRET, sent as `x-disco-signature` + `x-disco-timestamp`.
  * The same scheme is verified on inbound calls (see verifyPlatformRequest).
  *
- * Endpoint paths below are the contract the platform should implement; change
- * them here once the real API is defined.
+ * DISCO_TOOLS_API_URL is the base for the platform's edge functions, e.g.
+ * https://<project>.supabase.co/functions/v1, with functions shopify-events,
+ * shopify-sync and shopify-health. See docs/PLATFORM_INTEGRATION.md.
  */
 
 const baseUrl = () => (process.env.DISCO_TOOLS_API_URL || "").replace(/\/$/, "");
@@ -49,7 +50,7 @@ export async function platformPost(path: string, data: unknown) {
 
 /** Forward a single Shopify webhook event. */
 export const sendEvent = (shop: string, topic: string, payload: unknown) =>
-  platformPost("/api/shopify/events", { shop, topic, payload });
+  platformPost("/shopify-events", { shop, topic, payload });
 
 /** Forward a batch of records from a bulk export. */
 export const sendBatch = (
@@ -59,13 +60,13 @@ export const sendBatch = (
   records: unknown[],
   final: boolean,
 ) =>
-  platformPost("/api/shopify/sync", { shop, resource, runId, records, final });
+  platformPost("/shopify-sync", { shop, resource, runId, records, final });
 
 /** Ping used by the admin UI to show connection health. */
 export async function platformHealth(): Promise<{ ok: boolean; detail: string }> {
   if (!platformConfigured()) return { ok: false, detail: "Not configured" };
   try {
-    const res = await fetch(`${baseUrl()}/api/shopify/health`, {
+    const res = await fetch(`${baseUrl()}/shopify-health`, {
       signal: AbortSignal.timeout(8_000),
     });
     return { ok: res.ok, detail: res.ok ? "Reachable" : `HTTP ${res.status}` };
