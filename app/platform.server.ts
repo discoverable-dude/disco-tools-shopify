@@ -12,8 +12,17 @@ import crypto from "node:crypto";
  * shopify-sync and shopify-health. See docs/PLATFORM_INTEGRATION.md.
  */
 
-const baseUrl = () => (process.env.DISCO_TOOLS_API_URL || "").replace(/\/$/, "");
-const secret = () => process.env.DISCO_TOOLS_API_SECRET || "";
+// `react-router dev` does not copy .env into process.env, so load it here as a
+// fallback. Existing environment variables (e.g. in production) are never overridden.
+try {
+  process.loadEnvFile();
+} catch {
+  // no .env file - fine
+}
+
+const clean = (v: string | undefined) => (v ?? "").trim().replace(/^["']|["']$/g, "");
+const baseUrl = () => clean(process.env.DISCO_TOOLS_API_URL).replace(/\/$/, "");
+const secret = () => clean(process.env.DISCO_TOOLS_API_SECRET);
 
 export function sign(body: string, timestamp: string) {
   return crypto
@@ -64,7 +73,8 @@ export const sendBatch = (
 
 /** Ping used by the admin UI to show connection health. */
 export async function platformHealth(): Promise<{ ok: boolean; detail: string }> {
-  if (!platformConfigured()) return { ok: false, detail: "Not configured" };
+  if (!baseUrl()) return { ok: false, detail: "Not configured: DISCO_TOOLS_API_URL is empty" };
+  if (!secret()) return { ok: false, detail: "Not configured: DISCO_TOOLS_API_SECRET is empty" };
   try {
     const res = await fetch(`${baseUrl()}/shopify-health`, {
       signal: AbortSignal.timeout(8_000),
