@@ -127,11 +127,12 @@ export default function Dashboard() {
               <Metric label="Refunded" value={money(d.sales.data.refunded, d.sales.data.currency)} />
             </s-grid>
             {d.sales.data.capped && <s-text>Showing the most recent 400 orders only.</s-text>}
-            <s-heading>Top products by revenue</s-heading>
+            {d.sales.data.orders === 0 && <s-text>No orders in this period.</s-text>}
+            {d.sales.data.topProducts.length > 0 && <s-heading>Top products by revenue</s-heading>}
             {d.sales.data.topProducts.map((p) => (
               <s-text key={p.title}>{p.title} · {p.units} sold · {money(p.revenue, d.sales.data!.currency)}</s-text>
             ))}
-            <s-heading>Sales channels</s-heading>
+            {d.sales.data.channels.length > 0 && <s-heading>Sales channels</s-heading>}
             {d.sales.data.channels.map((c) => (
               <s-text key={c.name}>{c.name} · {c.orders} orders · {money(c.revenue, d.sales.data!.currency)}</s-text>
             ))}

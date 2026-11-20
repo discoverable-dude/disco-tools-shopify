@@ -75,13 +75,21 @@ export const sendBatch = (
 export async function platformHealth(): Promise<{ ok: boolean; detail: string }> {
   if (!baseUrl()) return { ok: false, detail: "Not configured: DISCO_TOOLS_API_URL is empty" };
   if (!secret()) return { ok: false, detail: "Not configured: DISCO_TOOLS_API_SECRET is empty" };
+  const url = `${baseUrl()}/shopify-health`;
+  let host = "invalid URL";
   try {
-    const res = await fetch(`${baseUrl()}/shopify-health`, {
-      signal: AbortSignal.timeout(8_000),
-    });
-    return { ok: res.ok, detail: res.ok ? "Reachable" : `HTTP ${res.status}` };
+    host = new URL(url).host;
+  } catch {
+    return { ok: false, detail: `DISCO_TOOLS_API_URL is not a valid URL (${baseUrl().slice(0, 40)})` };
+  }
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+    return { ok: res.ok, detail: res.ok ? "Reachable" : `HTTP ${res.status} from ${host}` };
   } catch (e) {
-    return { ok: false, detail: (e as Error).message };
+    // Node wraps the real reason (ENOTFOUND, ECONNREFUSED, cert errors...) in `cause`.
+    const err = e as Error & { cause?: { code?: string; message?: string } };
+    const reason = err.cause?.code || err.cause?.message || err.message;
+    return { ok: false, detail: `Cannot reach ${host}: ${reason}` };
   }
 }
 
