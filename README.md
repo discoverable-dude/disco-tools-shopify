@@ -31,15 +31,16 @@ and request **Protected customer data** access (needed for customers/orders PII)
 App -> platform (edge functions under DISCO_TOOLS_API_URL): `POST /shopify-events`, `POST /shopify-sync`, `GET /shopify-health`.
 Platform -> app: `POST /api/push/seo`, `POST /api/sync`.
 
-## Before production
-- Switch Prisma to Postgres and re-create migrations; host somewhere long-running (the bulk download runs after the webhook returns).
-- Schedule a call to `POST /api/sync {"retry":true}` every few minutes to flush the outbox.
-- Customer/order fields are kept minimal until Protected Customer Data is approved.
+## Hosting
+Deploys to Vercel with Postgres: see `docs/DEPLOY_VERCEL.md`. Local dev also needs a Postgres
+`DATABASE_URL` / `DIRECT_URL` in `.env` (use a separate dev database or Neon branch).
+Schedule a call to `POST /api/sync {"retry":true}` every few minutes (from the platform) to flush the outbox.
+Customer/order fields are kept minimal until Protected Customer Data is approved.
 
 Full platform build instructions (paste-ready for Lovable): `docs/PLATFORM_INTEGRATION.md`.
 
 ## Installing on a client store (custom distribution)
-1. Host the app on a long-running server with Postgres (see "Before production"), set the production URL in `shopify.app.toml` (`application_url`, `auth.redirect_urls`) and run `npm run deploy`.
+1. Deploy to Vercel (see `docs/DEPLOY_VERCEL.md`), set the production URL in `shopify.app.toml` (`application_url`, `auth.redirect_urls`) and run `npm run deploy`.
 2. Partner Dashboard -> Apps -> Discoverable Connector -> Distribution -> **Custom distribution** (permanent choice).
 3. Enter the client's `.myshopify.com` domain to generate an install link for that store.
 4. Send the link to the store owner or a staff member with app permissions to approve; or install it yourself if you have collaborator access.

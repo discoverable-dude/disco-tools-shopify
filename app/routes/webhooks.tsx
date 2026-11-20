@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs } from "react-router";
+import { waitUntil } from "@vercel/functions";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { recordAndDeliver } from "../outbox.server";
@@ -28,11 +29,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     case "BULK_OPERATIONS_FINISH":
       // Shopify expects a response within 5s; the download/forward runs in the background.
-      void finishSync(
-        shop,
-        payload.admin_graphql_api_id as string,
-        String(payload.status).toLowerCase(),
-      ).catch((e) => console.error("finishSync failed", e));
+      waitUntil(
+        finishSync(
+          shop,
+          payload.admin_graphql_api_id as string,
+          String(payload.status).toLowerCase(),
+        ).catch((e) => console.error("finishSync failed", e)),
+      );
       break;
 
     // Compliance topics: forward so the platform can honour redact/export requests.
