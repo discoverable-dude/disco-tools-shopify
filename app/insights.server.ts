@@ -15,6 +15,9 @@ export type SeoAudit = {
   missingAlt: number;
   duplicateTitles: number;
   draftOrArchived: number;
+  audited: number;
+  withIssues: number;
+  score: number;
   worst: SeoIssue[];
   capped: boolean;
 };
@@ -77,6 +80,9 @@ export async function getSeoAudit(admin: Admin): Promise<SeoAudit> {
     missingAlt: 0,
     duplicateTitles: 0,
     draftOrArchived: 0,
+    audited: 0,
+    withIssues: 0,
+    score: 100,
     worst: [],
     capped: p.capped || c.capped,
   };
@@ -96,6 +102,7 @@ export async function getSeoAudit(admin: Admin): Promise<SeoAudit> {
       audit.draftOrArchived++;
       return; // don't audit unpublished products
     }
+    audit.audited++;
     if (!mt) { audit.missingMetaTitle++; problems.push("No meta title"); }
     else if (mt.length > 60) { audit.metaTitleTooLong++; problems.push(`Meta title ${mt.length} chars (max 60)`); }
     if (!md) { audit.missingMetaDescription++; problems.push("No meta description"); }
@@ -113,6 +120,8 @@ export async function getSeoAudit(admin: Admin): Promise<SeoAudit> {
   p.nodes.forEach((n) => check(n, "product"));
   c.nodes.forEach((n) => check(n, "collection"));
 
+  audit.withIssues = issues.length;
+  audit.score = audit.audited ? Math.round((100 * (audit.audited - issues.length)) / audit.audited) : 100;
   audit.worst = issues.sort((a, b) => b.problems.length - a.problems.length).slice(0, 10);
   return audit;
 }

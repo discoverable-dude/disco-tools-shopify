@@ -37,3 +37,12 @@ Platform -> app: `POST /api/push/seo`, `POST /api/sync`.
 - Customer/order fields are kept minimal until Protected Customer Data is approved.
 
 Full platform build instructions (paste-ready for Lovable): `docs/PLATFORM_INTEGRATION.md`.
+
+## Installing on a client store (custom distribution)
+1. Host the app on a long-running server with Postgres (see "Before production"), set the production URL in `shopify.app.toml` (`application_url`, `auth.redirect_urls`) and run `npm run deploy`.
+2. Partner Dashboard -> Apps -> Discoverable Connector -> Distribution -> **Custom distribution** (permanent choice).
+3. Enter the client's `.myshopify.com` domain to generate an install link for that store.
+4. Send the link to the store owner or a staff member with app permissions to approve; or install it yourself if you have collaborator access.
+5. In Discoverable Tools link the store to the client, then run the first sync from the Agency page (`/app/agency`, passcode `AGENCY_PASSCODE`).
+
+Client staff see only the branded dashboard (SEO health, sales, contact card). Branding is set in `app/brand.ts` / `BRAND_*` env vars.
