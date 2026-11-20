@@ -21,13 +21,18 @@ const QUERIES: Record<Resource, string> = {
     subtotalPriceSet { shopMoney { amount } }
     totalDiscountsSet { shopMoney { amount } }
     totalRefundedSet { shopMoney { amount } }
-    landingSite referringSite
     lineItems { edges { node { id title quantity sku product { id } } } }
   } } } }`,
   customers: `{ customers { edges { node {
     id createdAt updatedAt numberOfOrders state
     amountSpent { amount currencyCode }
   } } } }`,
+};
+
+const CHILD_KEYS: Record<string, string> = {
+  ProductVariant: "variants",
+  Collection: "collections",
+  LineItem: "lineItems",
 };
 
 export async function startSync(admin: Admin, shop: string, resource: Resource) {
@@ -86,23 +91,39 @@ export async function finishSync(shop: string, bulkOpId: string, status: string)
       const reader = file.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = "";
       let batch: unknown[] = [];
+      let current: Record<string, unknown> | null = null;
       const flush = async () => {
         if (!batch.length) return;
         await sendBatch(shop, run.resource, run.id, batch, false);
         count += batch.length;
         batch = [];
       };
+      // Bulk JSONL lists children after their parent with __parentId. Re-nest them
+      // (variants, collections, lineItems) so the platform receives one object per record.
+      const handle = async (line: string) => {
+        const row = JSON.parse(line) as Record<string, unknown>;
+        const parentId = row.__parentId as string | undefined;
+        if (!parentId) {
+          if (current) batch.push(current);
+          current = row;
+          if (batch.length >= 500) await flush();
+          return;
+        }
+        if (!current) return;
+        const type = String(row.id).split("/")[3];
+        const key = CHILD_KEYS[type] ?? `${type}s`;
+        delete row.__parentId;
+        ((current[key] ??= []) as unknown[]).push(row);
+      };
       for (;;) {
         const { value, done } = await reader.read();
         if (value) buffer += value;
         const lines = buffer.split("\n");
         buffer = done ? "" : (lines.pop() ?? "");
-        for (const line of lines) {
-          if (line.trim()) batch.push(JSON.parse(line));
-          if (batch.length >= 500) await flush();
-        }
+        for (const line of lines) if (line.trim()) await handle(line);
         if (done) break;
       }
+      if (current) batch.push(current);
       await flush();
     }
     await sendBatch(shop, run.resource, run.id, [], true);

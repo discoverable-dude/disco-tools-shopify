@@ -1,9 +1,14 @@
+import { waitUntil } from "@vercel/functions";
 import db from "./db.server";
 import { sendEvent } from "./platform.server";
 
 const MAX_ATTEMPTS = 8;
 
-/** Persist the event first so nothing is lost if the platform is down, then try to deliver. */
+/**
+ * Persist the event first so nothing is lost if the platform is down, then deliver in the
+ * background (waitUntil keeps the serverless function alive after the 200 is returned,
+ * which Shopify needs within 5 seconds).
+ */
 export async function recordAndDeliver(
   shop: string,
   topic: string,
@@ -17,7 +22,7 @@ export async function recordAndDeliver(
   const event = await db.webhookEvent.create({
     data: { shop, topic, webhookId: webhookId ?? null, payload: JSON.stringify(payload) },
   });
-  await deliver(event.id);
+  waitUntil(deliver(event.id));
   return event;
 }
 

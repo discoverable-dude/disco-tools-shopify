@@ -2,11 +2,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// SQLite is fine for local dev. For production across many client stores switch
-// the provider to "postgresql", set DATABASE_URL, and re-create migrations.
+// Postgres everywhere (Vercel has no persistent disk). DATABASE_URL should be the
+// pooled connection string; DIRECT_URL the direct one, used by migrations.
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Session {

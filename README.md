@@ -6,11 +6,14 @@ Discoverable Tools and lets the platform push SEO changes back.
 ## Setup (on your machine)
 ```bash
 npm install
-npx shopify app config link      # pick/create the app in the Partner Dashboard (distribution: Custom)
-cp .env.example .env             # DISCO_TOOLS_API_URL / DISCO_TOOLS_API_SECRET
-npm run dev                      # tunnel + install on a dev store
-npm run deploy                   # push scopes/webhooks config
+npx shopify app config link
+cp .env.example .env
+npm run dev
+npm run deploy
 ```
+`config link` picks or creates the app (distribution: Custom). Edit `.env` to set the platform URL and secret.
+`npm run dev` starts the tunnel and installs on a dev store; `npm run deploy` pushes scopes and webhook config.
+
 In the Partner Dashboard: choose **Custom distribution**, generate an install link per client store,
 and request **Protected customer data** access (needed for customers/orders PII).
 
@@ -25,10 +28,22 @@ and request **Protected customer data** access (needed for customers/orders PII)
 | Admin dashboard (connection, sync, webhook health, pushes) | `app/routes/app._index.tsx` |
 
 ## Platform contract (all requests HMAC-SHA256 signed: `x-disco-timestamp`, `x-disco-signature` over `${ts}.${body}`)
-App -> platform: `POST /api/shopify/events`, `POST /api/shopify/sync`, `GET /api/shopify/health`.
+App -> platform (edge functions under DISCO_TOOLS_API_URL): `POST /shopify-events`, `POST /shopify-sync`, `GET /shopify-health`.
 Platform -> app: `POST /api/push/seo`, `POST /api/sync`.
 
-## Before production
-- Switch Prisma to Postgres and re-create migrations; host somewhere long-running (the bulk download runs after the webhook returns).
-- Schedule a call to `POST /api/sync {"retry":true}` every few minutes to flush the outbox.
-- Customer/order fields are kept minimal until Protected Customer Data is approved.
+## Hosting
+Deploys to Vercel with Postgres: see `docs/DEPLOY_VERCEL.md`. Local dev also needs a Postgres
+`DATABASE_URL` / `DIRECT_URL` in `.env` (use a separate dev database or Neon branch).
+Schedule a call to `POST /api/sync {"retry":true}` every few minutes (from the platform) to flush the outbox.
+Customer/order fields are kept minimal until Protected Customer Data is approved.
+
+Full platform build instructions (paste-ready for Lovable): `docs/PLATFORM_INTEGRATION.md`.
+
+## Installing on a client store (custom distribution)
+1. Deploy to Vercel (see `docs/DEPLOY_VERCEL.md`), set the production URL in `shopify.app.toml` (`application_url`, `auth.redirect_urls`) and run `npm run deploy`.
+2. Partner Dashboard -> Apps -> Discoverable Connector -> Distribution -> **Custom distribution** (permanent choice).
+3. Enter the client's `.myshopify.com` domain to generate an install link for that store.
+4. Send the link to the store owner or a staff member with app permissions to approve; or install it yourself if you have collaborator access.
+5. In Discoverable Tools link the store to the client, then run the first sync from the Agency page (`/app/agency`, passcode `AGENCY_PASSCODE`).
+
+Client staff see only the branded dashboard (SEO health, sales, contact card). Branding is set in `app/brand.ts` / `BRAND_*` env vars.

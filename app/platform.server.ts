@@ -7,12 +7,22 @@ import crypto from "node:crypto";
  * DISCO_TOOLS_API_SECRET, sent as `x-disco-signature` + `x-disco-timestamp`.
  * The same scheme is verified on inbound calls (see verifyPlatformRequest).
  *
- * Endpoint paths below are the contract the platform should implement; change
- * them here once the real API is defined.
+ * DISCO_TOOLS_API_URL is the base for the platform's edge functions, e.g.
+ * https://<project>.supabase.co/functions/v1, with functions shopify-events,
+ * shopify-sync and shopify-health. See docs/PLATFORM_INTEGRATION.md.
  */
 
-const baseUrl = () => (process.env.DISCO_TOOLS_API_URL || "").replace(/\/$/, "");
-const secret = () => process.env.DISCO_TOOLS_API_SECRET || "";
+// `react-router dev` does not copy .env into process.env, so load it here as a
+// fallback. Existing environment variables (e.g. in production) are never overridden.
+try {
+  process.loadEnvFile();
+} catch {
+  // no .env file - fine
+}
+
+const clean = (v: string | undefined) => (v ?? "").trim().replace(/^["']|["']$/g, "");
+const baseUrl = () => clean(process.env.DISCO_TOOLS_API_URL).replace(/\/$/, "");
+const secret = () => clean(process.env.DISCO_TOOLS_API_SECRET);
 
 export function sign(body: string, timestamp: string) {
   return crypto
@@ -49,7 +59,7 @@ export async function platformPost(path: string, data: unknown) {
 
 /** Forward a single Shopify webhook event. */
 export const sendEvent = (shop: string, topic: string, payload: unknown) =>
-  platformPost("/api/shopify/events", { shop, topic, payload });
+  platformPost("/shopify-events", { shop, topic, payload });
 
 /** Forward a batch of records from a bulk export. */
 export const sendBatch = (
@@ -59,18 +69,27 @@ export const sendBatch = (
   records: unknown[],
   final: boolean,
 ) =>
-  platformPost("/api/shopify/sync", { shop, resource, runId, records, final });
+  platformPost("/shopify-sync", { shop, resource, runId, records, final });
 
 /** Ping used by the admin UI to show connection health. */
 export async function platformHealth(): Promise<{ ok: boolean; detail: string }> {
-  if (!platformConfigured()) return { ok: false, detail: "Not configured" };
+  if (!baseUrl()) return { ok: false, detail: "Not configured: DISCO_TOOLS_API_URL is empty" };
+  if (!secret()) return { ok: false, detail: "Not configured: DISCO_TOOLS_API_SECRET is empty" };
+  const url = `${baseUrl()}/shopify-health`;
+  let host = "invalid URL";
   try {
-    const res = await fetch(`${baseUrl()}/api/shopify/health`, {
-      signal: AbortSignal.timeout(8_000),
-    });
-    return { ok: res.ok, detail: res.ok ? "Reachable" : `HTTP ${res.status}` };
+    host = new URL(url).host;
+  } catch {
+    return { ok: false, detail: `DISCO_TOOLS_API_URL is not a valid URL (${baseUrl().slice(0, 40)})` };
+  }
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+    return { ok: res.ok, detail: res.ok ? "Reachable" : `HTTP ${res.status} from ${host}` };
   } catch (e) {
-    return { ok: false, detail: (e as Error).message };
+    // Node wraps the real reason (ENOTFOUND, ECONNREFUSED, cert errors...) in `cause`.
+    const err = e as Error & { cause?: { code?: string; message?: string } };
+    const reason = err.cause?.code || err.cause?.message || err.message;
+    return { ok: false, detail: `Cannot reach ${host}: ${reason}` };
   }
 }
 
