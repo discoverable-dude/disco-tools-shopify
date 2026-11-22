@@ -39,6 +39,9 @@ Customer/order fields are kept minimal until Protected Customer Data is approved
 
 Full platform build instructions (paste-ready for Lovable): `docs/PLATFORM_INTEGRATION.md`.
 
+## Adding clients
+Each client store gets its own custom Shopify app but they all share this deployment. Follow `docs/ADD_A_CLIENT.md`.
+
 ## Installing on a client store (custom distribution)
 1. Deploy to Vercel (see `docs/DEPLOY_VERCEL.md`), set the production URL in `shopify.app.toml` (`application_url`, `auth.redirect_urls`) and run `npm run deploy`.
 2. Partner Dashboard -> Apps -> Discoverable Connector -> Distribution -> **Custom distribution** (permanent choice).

@@ -90,3 +90,14 @@ model PushAudit {
 
   @@index([shop, createdAt])
 }
+
+// Shopify app credentials per client store, so one deployment can serve many custom apps.
+// The secret is stored AES-256-GCM encrypted (key: APP_ENCRYPTION_KEY).
+model AppCredential {
+  shop            String   @id
+  clientId        String
+  clientSecretEnc String
+  label           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

@@ -1,5 +1,9 @@
 # Deploying the Connector on Vercel
 
+> One deployment serves every client store. For adding clients see `docs/ADD_A_CLIENT.md`. The
+> "create a second app" step below applies to the first (default) app only; later clients use
+> `npm run client:config` and the `/admin/clients` page.
+
 The app runs as serverless functions on Vercel with a Postgres database. Webhook delivery and
 bulk-sync downloads continue after the response using `waitUntil`, so Shopify gets its 200 inside
 the 5 second limit.
