@@ -1,0 +1,39 @@
+# Template for every client's app. Do not edit per client: run
+#   npm run client:config -- <config-name>
+# after `npx shopify app config link`, which keeps the client_id and rewrites the rest.
+client_id = "__CLIENT_ID__"
+name = "__NAME__"
+application_url = "__APP_URL__"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_orders,read_customers,read_inventory,read_content,write_content,read_online_store_navigation,read_markets"
+
+[auth]
+redirect_urls = ["__APP_URL__/auth/callback"]
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks"
+  topics = [
+    "app/uninstalled",
+    "app/scopes_update",
+    "products/create",
+    "products/update",
+    "products/delete",
+    "collections/create",
+    "collections/update",
+    "collections/delete",
+    "orders/create",
+    "orders/updated",
+    "customers/create",
+    "customers/update",
+    "inventory_levels/update",
+    "bulk_operations/finish"
+  ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks"
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]

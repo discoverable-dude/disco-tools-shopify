@@ -17,7 +17,8 @@
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && react-router build"
+    "vercel-build": "prisma generate && prisma migrate deploy && react-router build",
+    "client:config": "node scripts/client-config.mjs"
   },
   "type": "module",
   "engines": {

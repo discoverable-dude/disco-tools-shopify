@@ -33,11 +33,14 @@ Platform -> app: `POST /api/push/seo`, `POST /api/sync`.
 
 ## Hosting
 Deploys to Vercel with Postgres: see `docs/DEPLOY_VERCEL.md`. Local dev also needs a Postgres
-`DATABASE_URL` / `DIRECT_URL` in `.env` (use a separate dev database or Neon branch).
+`DATABASE_URL` / `DATABASE_URL_UNPOOLED` in `.env` (use a separate dev database or Neon branch).
 Schedule a call to `POST /api/sync {"retry":true}` every few minutes (from the platform) to flush the outbox.
 Customer/order fields are kept minimal until Protected Customer Data is approved.
 
 Full platform build instructions (paste-ready for Lovable): `docs/PLATFORM_INTEGRATION.md`.
+
+## Adding clients
+Each client store gets its own custom Shopify app but they all share this deployment. Follow `docs/ADD_A_CLIENT.md`.
 
 ## Installing on a client store (custom distribution)
 1. Deploy to Vercel (see `docs/DEPLOY_VERCEL.md`), set the production URL in `shopify.app.toml` (`application_url`, `auth.redirect_urls`) and run `npm run deploy`.

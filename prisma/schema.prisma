@@ -3,11 +3,11 @@ generator client {
 }
 
 // Postgres everywhere (Vercel has no persistent disk). DATABASE_URL should be the
-// pooled connection string; DIRECT_URL the direct one, used by migrations.
+// pooled connection string; DATABASE_URL_UNPOOLED the direct one, used by migrations (Neon's Vercel integration creates both).
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model Session {
@@ -89,4 +89,15 @@ model PushAudit {
   createdAt  DateTime @default(now())
 
   @@index([shop, createdAt])
+}
+
+// Shopify app credentials per client store, so one deployment can serve many custom apps.
+// The secret is stored AES-256-GCM encrypted (key: APP_ENCRYPTION_KEY).
+model AppCredential {
+  shop            String   @id
+  clientId        String
+  clientSecretEnc String
+  label           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

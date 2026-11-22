@@ -1,5 +1,9 @@
 # Deploying the Connector on Vercel
 
+> One deployment serves every client store. For adding clients see `docs/ADD_A_CLIENT.md`. The
+> "create a second app" step below applies to the first (default) app only; later clients use
+> `npm run client:config` and the `/admin/clients` page.
+
 The app runs as serverless functions on Vercel with a Postgres database. Webhook delivery and
 bulk-sync downloads continue after the response using `waitUntil`, so Shopify gets its 200 inside
 the 5 second limit.
@@ -23,7 +27,7 @@ Then in the Partner Dashboard open the new app -> Distribution -> **Custom distr
 ## 2. Database (Postgres)
 Add a Postgres database: Vercel project -> Storage -> Neon (or Supabase, or any hosted Postgres).
 - `DATABASE_URL`: the **pooled** connection string.
-- `DIRECT_URL`: the **direct / unpooled** string (used by migrations during the build).
+- `DATABASE_URL_UNPOOLED`: the **direct / unpooled** string (used by migrations during the build).
 Use a separate database or branch for local development, with its own two strings in your local `.env`.
 Migrations run automatically on every deploy (`vercel-build` runs `prisma migrate deploy`).
 
@@ -37,7 +41,7 @@ Migrations run automatically on every deploy (`vercel-build` runs `prisma migrat
 | `SHOPIFY_API_KEY` / `SHOPIFY_API_SECRET` | from the **production** app in the Partner Dashboard |
 | `SCOPES` | same list as `scopes` in the toml |
 | `SHOPIFY_APP_URL` | `https://<your-vercel-domain>` |
-| `DATABASE_URL`, `DIRECT_URL` | from step 2 |
+| `DATABASE_URL`, `DATABASE_URL_UNPOOLED` | created by the Neon integration |
 | `DISCO_TOOLS_API_URL` | `https://qjhhnukvfxtgpnphbrcy.supabase.co/functions/v1` |
 | `DISCO_TOOLS_API_SECRET` | the shared secret (same as Lovable's `SHOPIFY_CONNECTOR_SECRET`) |
 | `DISCO_TOOLS_APP_URL` | base URL of Discoverable Tools |
