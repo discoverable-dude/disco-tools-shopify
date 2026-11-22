@@ -39,7 +39,7 @@ Open `https://disco-tools-shopify.vercel.app/admin/clients`, enter the agency pa
 3. In the app inside Shopify admin open Agency tools (`/app/agency`) and run **Sync products**.
 
 ## One-off setup (already done once)
-In Vercel set `APP_ENCRYPTION_KEY` (openssl rand -hex 32), `AGENCY_PASSCODE`, `DATABASE_URL`, `DIRECT_URL`,
+In Vercel set `APP_ENCRYPTION_KEY` (openssl rand -hex 32), `AGENCY_PASSCODE`, `DATABASE_URL`, `DATABASE_URL_UNPOOLED`,
 `DISCO_TOOLS_API_URL`, `DISCO_TOOLS_API_SECRET`, `SHOPIFY_APP_URL`, `SCOPES`. `SHOPIFY_API_KEY` and
 `SHOPIFY_API_SECRET` are only the default app, used for any store without an entry on the clients page.
 
