@@ -11,15 +11,15 @@ Time per client: about 10 minutes. Run commands from the project folder (`cd ~/d
 ```bash
 npx shopify app config link
 ```
-Choose **Create new app**, name it `Discoverable Tools`, and give the config the client's name, for example `acme`.
+Choose **Create new app**, name it `Discoverable - ClientName` (Shopify limits app names to 29 characters, so keep the client name short), and give the config the client's name, for example `acme`.
 
 ```bash
-npm run client:config -- acme
+npm run client:config -- acme --name "Discoverable - Acme"
 ```
 This rewrites `shopify.app.acme.toml` with the standard scopes, webhooks and the Connector address.
 
 ```bash
-npx shopify app deploy --config acme
+npx shopify app deploy --config acme --force
 ```
 
 ## 2. Set up the app in the Dev Dashboard
@@ -28,10 +28,10 @@ Open the new app at dev.shopify.com -> Apps -> the app:
 2. **Settings -> IP allowlist -> Manage**: ASN `16509`, country United Kingdom, run the test, turn on Enforce. (Required before installing on a store outside your organization.)
 3. **Settings -> Protected customer data -> Manage** if you need customer sync (Shopify approves this).
 4. **Overview -> Distribution card -> Select distribution method -> Custom distribution**, enter the client's `.myshopify.com` address and click **Generate link**. Choose "limit to a single store" unless the client is a Plus organization with several stores.
-5. Copy the **Client ID** and **Client secret** from Settings -> Credentials.
+5. Copy the **Client ID** and the **Client secret** from Settings -> Credentials. The secret is behind the eye icon and starts `shpss_`. It is a different, longer value than the Client ID; pasting the Client ID into the secret field makes every login fail with a 401.
 
 ## 3. Register the app keys
-Open `https://disco-tools-shopify.vercel.app/admin/clients`, enter the agency passcode, then the store address, Client ID and Client secret. The secret is stored encrypted.
+Open `https://disco-tools-shopify.vercel.app/admin/clients`, enter the agency passcode, then the store address, Client ID and Client secret. The secret is stored encrypted. Check it by opening `https://disco-tools-shopify.vercel.app/api/diagnose?shop=<store>.myshopify.com`: `registeredAppForShop` should show the first 8 characters of the Client ID and a `secretLength` of 38.
 
 ## 4. Install and link
 1. Send the install link to the store owner (or approve it yourself with collaborator access).

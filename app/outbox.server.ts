@@ -1,6 +1,7 @@
 import { waitUntil } from "@vercel/functions";
 import db from "./db.server";
 import { sendEvent } from "./platform.server";
+import { redactForPlatform } from "./redact.server";
 
 const MAX_ATTEMPTS = 8;
 
@@ -20,7 +21,7 @@ export async function recordAndDeliver(
     if (existing) return existing; // Shopify retried - already stored
   }
   const event = await db.webhookEvent.create({
-    data: { shop, topic, webhookId: webhookId ?? null, payload: JSON.stringify(payload) },
+    data: { shop, topic, webhookId: webhookId ?? null, payload: JSON.stringify(redactForPlatform(topic, payload)) },
   });
   waitUntil(deliver(event.id));
   return event;

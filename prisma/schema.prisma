@@ -101,3 +101,19 @@ model AppCredential {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+// Daily snapshot of the on-page SEO audit, so the dashboard can chart progress over time.
+model SeoSnapshot {
+  id                     String   @id @default(cuid())
+  shop                   String
+  takenAt                DateTime @default(now())
+  score                  Int
+  audited                Int
+  withIssues             Int
+  missingMetaTitle       Int
+  missingMetaDescription Int
+  missingAlt             Int
+  duplicateTitles        Int
+
+  @@index([shop, takenAt])
+}

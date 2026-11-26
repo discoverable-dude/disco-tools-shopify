@@ -19,3 +19,36 @@ export function missingScopes(granted: string[]) {
     return true;
   });
 }
+
+/** Plain-English description of each permission, shown to the store owner. */
+export const SCOPE_INFO: { scope: string; label: string; detail: string; used: boolean }[] = [
+  { scope: "read_products", label: "Products and collections", detail: "Read titles, descriptions, SEO fields and image alt text to check on-page SEO.", used: true },
+  { scope: "write_products", label: "Edit product SEO", detail: "Update SEO fields only when your Discoverable team applies an approved change. Every change is logged below and can be undone.", used: true },
+  { scope: "read_orders", label: "Orders (sales only)", detail: "Order totals, items and sales channel for reporting. Customer names, emails, phone numbers and addresses are never sent to Discoverable.", used: true },
+  { scope: "read_customers", label: "Customer totals", detail: "Anonymous customer counts, order counts and spend. No names, emails or addresses are sent to Discoverable.", used: true },
+  { scope: "read_inventory", label: "Stock levels", detail: "Know when products go out of stock so reports and ads stay accurate.", used: true },
+  { scope: "read_content", label: "Pages and blog posts", detail: "Reserved for page and blog SEO checks. Not used yet.", used: false },
+  { scope: "write_content", label: "Edit pages and blog posts", detail: "Reserved for approved page and blog SEO changes. Not used yet.", used: false },
+  { scope: "read_online_store_navigation", label: "Menus and redirects", detail: "Reserved for redirect and navigation checks. Not used yet.", used: false },
+  { scope: "read_markets", label: "Markets", detail: "Reserved for international SEO checks. Not used yet.", used: false },
+];
+
+/** True when the scope, or its write_ counterpart, was granted. */
+export function hasScope(granted: string[], scope: string) {
+  return granted.includes(scope) || (scope.startsWith("read_") && granted.includes(scope.replace("read_", "write_")));
+}
+
+/** Friendly names for webhook topics. */
+export const TOPIC_LABELS: Record<string, string> = {
+  PRODUCTS_CREATE: "New products",
+  PRODUCTS_UPDATE: "Product changes",
+  PRODUCTS_DELETE: "Products removed",
+  COLLECTIONS_CREATE: "New collections",
+  COLLECTIONS_UPDATE: "Collection changes",
+  COLLECTIONS_DELETE: "Collections removed",
+  ORDERS_CREATE: "New orders",
+  ORDERS_UPDATED: "Order updates",
+  CUSTOMERS_CREATE: "New customers (totals only)",
+  CUSTOMERS_UPDATE: "Customer total updates",
+  INVENTORY_LEVELS_UPDATE: "Stock level changes",
+};
