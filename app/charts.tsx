@@ -266,3 +266,120 @@ export function Row({ children, last }: { children: ReactNode; last?: boolean })
     </div>
   );
 }
+
+/** Two-series stacked bars (for example new vs returning customers by day). */
+export function StackedBars(props: {
+  data: { label: string; a: number; b: number; tip?: string }[];
+  format?: (n: number) => string;
+  colors?: [string, string];
+  names?: [string, string];
+  height?: number;
+}) {
+  const { data, format = (n) => String(Math.round(n)), colors = [palette.teal2, palette.teal3], names = ["", ""], height = 180 } = props;
+  const W = 640;
+  const padL = 44;
+  const padB = 22;
+  const padT = 8;
+  const max = Math.max(...data.map((d) => d.a + d.b), 1);
+  const n = Math.max(data.length, 1);
+  const slot = (W - padL) / n;
+  const bw = Math.max(Math.min(slot * 0.68, 22), 2);
+  const innerH = height - padB - padT;
+  const y = (v: number) => padT + innerH - (v / max) * innerH;
+  const total = data.reduce((s, d) => s + d.a + d.b, 0);
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${height}`} width="100%" role="img" aria-label="Stacked bar chart" style={{ display: "block", fontFamily: font }}>
+        {[0, 0.5, 1].map((t) => (
+          <g key={t}>
+            <line x1={padL} x2={W} y1={y(max * t)} y2={y(max * t)} stroke={palette.line} strokeWidth={1} />
+            <text x={padL - 6} y={y(max * t) + 4} fontSize={10} textAnchor="end" fill={palette.muted}>{format(max * t)}</text>
+          </g>
+        ))}
+        {data.map((d, i) => {
+          const x = padL + i * slot + (slot - bw) / 2;
+          const hb = (d.b / max) * innerH;
+          const ha = (d.a / max) * innerH;
+          return (
+            <g key={i}>
+              <rect x={x} y={y(d.a + d.b)} width={bw} height={Math.max(hb, 0)} rx={2} fill={colors[1]}>
+                <title>{d.tip ?? `${d.label}: ${names[1]} ${format(d.b)}`}</title>
+              </rect>
+              <rect x={x} y={y(d.a)} width={bw} height={Math.max(ha, 0)} rx={2} fill={colors[0]}>
+                <title>{d.tip ?? `${d.label}: ${names[0]} ${format(d.a)}`}</title>
+              </rect>
+            </g>
+          );
+        })}
+        {data.length > 0 &&
+          [0, Math.floor((data.length - 1) / 2), data.length - 1].map((i, k) => (
+            <text key={k} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"} fill={palette.muted}>
+              {data[i].label}
+            </text>
+          ))}
+        {total === 0 && (
+          <text x={(W + padL) / 2} y={height / 2} textAnchor="middle" fontSize={12} fill={palette.muted}>No data in this period</text>
+        )}
+      </svg>
+      {names[0] && (
+        <div style={{ display: "flex", gap: 16, fontSize: 12, color: palette.muted, fontFamily: font, marginTop: 4 }}>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: colors[0], marginRight: 6 }} />{names[0]}</span>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: colors[1], marginRight: 6 }} />{names[1]}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export type Column<T> = { label: string; align?: "left" | "right"; render: (row: T) => ReactNode; width?: number | string };
+
+/** Simple responsive table in the dashboard style. */
+export function DataTable<T>(props: { columns: Column<T>[]; rows: T[]; empty?: string; rowKey: (row: T) => string }) {
+  const { columns, rows, empty = "Nothing to show yet.", rowKey } = props;
+  if (!rows.length) return <div style={{ color: palette.muted, fontSize: 13, fontFamily: font }}>{empty}</div>;
+  const cell: CSSProperties = { padding: "9px 10px", borderBottom: `1px solid ${palette.line}`, fontSize: 13, verticalAlign: "middle" };
+  return (
+    <div style={{ overflowX: "auto", fontFamily: font }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            {columns.map((c) => (
+              <th key={c.label} style={{ ...cell, textAlign: c.align ?? "left", color: palette.muted, fontWeight: 500, fontSize: 12, whiteSpace: "nowrap", width: c.width }}>
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={rowKey(r)}>
+              {columns.map((c) => (
+                <td key={c.label} style={{ ...cell, textAlign: c.align ?? "left" }}>{c.render(r)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Background shade for a value between 0 and 1 (teal scale), used for cohort heat cells. */
+export const heat = (v: number) => `rgba(11, 107, 102, ${Math.max(0.06, Math.min(0.85, v * 0.85))})`;
+
+export function Note({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "warn" }) {
+  return (
+    <div
+      style={{
+        background: tone === "warn" ? "#fbf0d9" : palette.tint,
+        color: palette.text,
+        borderRadius: 10,
+        padding: "10px 14px",
+        fontSize: 13,
+        fontFamily: font,
+      }}
+    >
+      {children}
+    </div>
+  );
+}

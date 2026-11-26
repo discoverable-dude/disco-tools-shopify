@@ -1,19 +1,16 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { waitUntil } from "@vercel/functions";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { brand } from "../brand";
-import { getOrderInsights, getSeoAudit, getStockAlerts, liveToSummary } from "../insights.server";
-import { loadSummary } from "../sales-summary.server";
-import { startSync } from "../sync.server";
+import { getOrderInsights, liveToSummary } from "../insights.server";
+import { ordersReport, safe } from "../tab-data.server";
 import { fetchDashboardInsights } from "../platform.server";
 import { hasScope, missingScopes, SCOPE_INFO } from "../scopes.server";
 import { TOPIC_LABELS } from "../labels";
-import { recordSnapshot, seoHistory } from "../seo-history.server";
 import { BrandHeader, fmt, money } from "../ui";
-import { BarChart, Card, Delta, Grid, HBars, Kpi, LineChart, palette, Pill, Ring, Row } from "../charts";
+import { BarChart, Card, Delta, Grid, HBars, Kpi, palette, Pill, Ring, Row } from "../charts";
 
 const DAY = 86_400_000;
 
@@ -22,68 +19,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = session.shop;
   const since = new Date(Date.now() - 30 * DAY);
 
-  // Each insight is isolated so a missing scope or schema change only blanks its own card.
-  const safe = async <T,>(fn: () => Promise<T>): Promise<{ data: T | null; error: string | null }> => {
-    try {
-      return { data: await fn(), error: null };
-    } catch (e) {
-      return { data: null, error: (e as Error).message };
-    }
-  };
+  // The saved sales report (built from Shopify's bulk export) is the source of truth. Small stores
+  // can use live numbers until the first report exists.
+  const report = await ordersReport(admin, shop);
 
-  // Sales come from a saved report built from Shopify's bulk export, so they are accurate for
-  // busy stores. It refreshes itself in the background when older than 12 hours.
-  const saved = await loadSummary(shop);
-  const stale = !saved || Date.now() - saved.computedAt.getTime() > 12 * 3_600_000;
-  if (stale) waitUntil(startSync(admin, shop, "orders").catch((e) => console.error("orders refresh failed", e)));
-
-  const [link, shopRes, live, seo, stock, platform, ordersRun] = await Promise.all([
+  const [link, shopRes, live, platform, snapshot, byTopic, delivery, runs, pushes] = await Promise.all([
     db.shopLink.findUnique({ where: { shop } }),
     admin.graphql(`#graphql
       query ShopName { shop { name } }`),
-    saved ? Promise.resolve({ data: null, error: null }) : safe(() => getOrderInsights(admin)),
-    safe(() => getSeoAudit(admin)),
-    safe(() => getStockAlerts(admin)),
+    report.data ? Promise.resolve({ data: null, error: null }) : safe(() => getOrderInsights(admin)),
     fetchDashboardInsights(shop),
-    db.syncRun.findFirst({ where: { shop, resource: "orders" }, orderBy: { startedAt: "desc" } }),
-  ]);
-
-  // Prefer the saved report; small stores can use the live numbers until the first report exists.
-  // While the saved report is being built, busy stores still show the latest orders (clearly
-  // labelled as partial) instead of an empty page.
-  const liveSummary = live.data ? liveToSummary(live.data) : null;
-  const salesData = saved?.data ?? liveSummary;
-  const sales = {
-    data: salesData,
-    partial: !saved && Boolean(live.data?.capped),
-    updatedAt: saved?.computedAt ?? null,
-    building: !saved && (!ordersRun || ordersRun.status === "running" || ordersRun.status === "delivering"),
-    failed: !saved && ordersRun?.status === "failed",
-    error: live.error,
-  };
-  const shopName: string = (await shopRes.json()).data?.shop?.name ?? shop;
-
-  // Progress history and what Discoverable has accessed or changed.
-  const [history, byTopic, delivery, runs, pushes] = await Promise.all([
-    safe(async () => {
-      if (seo.data) await recordSnapshot(shop, seo.data);
-      return seoHistory(shop);
-    }),
+    db.seoSnapshot.findFirst({ where: { shop }, orderBy: { takenAt: "desc" } }),
     db.webhookEvent.groupBy({ by: ["topic"], where: { shop, receivedAt: { gte: since } }, _count: { _all: true } }),
     db.webhookEvent.groupBy({ by: ["status"], where: { shop, receivedAt: { gte: since } }, _count: { _all: true } }),
     db.syncRun.findMany({ where: { shop, startedAt: { gte: since } }, orderBy: { startedAt: "desc" }, take: 6 }),
     db.pushAudit.findMany({ where: { shop }, orderBy: { createdAt: "desc" }, take: 8 }),
   ]);
+  const shopName: string = (await shopRes.json()).data?.shop?.name ?? shop;
+
+  // While the saved report is being built, busy stores still show the latest orders (clearly
+  // labelled as partial) instead of an empty page.
+  const liveSummary = live.data ? liveToSummary(live.data) : null;
+  const salesData = report.data ?? liveSummary;
+  const sales = {
+    data: salesData,
+    partial: !report.data && Boolean(live.data?.capped),
+    updatedAt: report.updatedAt,
+    building: report.building,
+    failed: report.failed,
+    error: live.error,
+  };
 
   const granted = (session.scope ?? "").split(",").filter(Boolean);
   return {
     shopName,
     link,
     sales,
-    seo,
-    stock,
+    seoScore: snapshot ? { score: snapshot.score, takenAt: snapshot.takenAt, withIssues: snapshot.withIssues, audited: snapshot.audited } : null,
     platform,
-    history: history.data ?? [],
     events: byTopic.map((t) => ({ topic: t.topic, count: t._count._all })).sort((a, b) => b.count - a.count),
     delivery: Object.fromEntries(delivery.map((d) => [d.status, d._count._all])) as Record<string, number>,
     runs,
@@ -119,9 +92,7 @@ const pct = (n: number) => `${n.toFixed(1)}%`;
 export default function Dashboard() {
   const d = useLoaderData<typeof loader>();
   const b = d.brand;
-  const seo = d.seo.data;
   const sales = d.sales.data;
-  const stock = d.stock.data;
   const plat = d.platform;
   const cur = sales?.currency ?? "GBP";
   const eventTotal = d.events.reduce((a, e) => a + e.count, 0);
@@ -245,25 +216,6 @@ export default function Dashboard() {
         </div>
       </s-section>
 
-      {stock && (
-        <s-section heading="Stock watch">
-          <Grid min={280}>
-            <Card title="Sold out" subtitle="Live products with no stock">
-              <div style={{ fontSize: 28, fontWeight: 700, color: stock.outOfStock > 0 ? palette.bad : palette.good }}>{stock.outOfStock}</div>
-              {stock.examples.map((e, idx) => (
-                <Row key={e.id} last={idx === stock.examples.length - 1}>
-                  <s-link href={`shopify:admin/products/${e.id.split("/").pop()}`}>{e.title}</s-link>
-                </Row>
-              ))}
-            </Card>
-            <Card title="Running low" subtitle="Live products with 5 or fewer left">
-              <div style={{ fontSize: 28, fontWeight: 700, color: stock.lowStock > 0 ? palette.warn : palette.good }}>{stock.lowStock}</div>
-              <div style={{ color: palette.muted, fontSize: 12, marginTop: 6 }}>Sold-out and low-stock pages can lose rankings and waste ad spend.</div>
-            </Card>
-          </Grid>
-        </s-section>
-      )}
-
       <s-section heading={`Search and ads, from ${b.agency}`}>
         {!plat && (
           <Card>
@@ -340,50 +292,22 @@ export default function Dashboard() {
         )}
       </s-section>
 
-      <s-section heading="On-page SEO health">
-        {d.seo.error && <s-banner tone="critical">Could not run the SEO check: {d.seo.error}</s-banner>}
-        {seo && (
-          <div style={{ display: "grid", gap: 14 }}>
-            <Grid min={280}>
-              <Card>
-                <Ring
-                  value={seo.score}
-                  label="SEO health score"
-                  sub={`${seo.audited - seo.withIssues} of ${seo.audited} pages pass every check`}
-                />
-              </Card>
-              <Card title="What needs attention" subtitle={`${seo.products} live products and ${seo.collections} collections checked`}>
-                <HBars
-                  color={palette.warn}
-                  items={[
-                    { label: "Missing meta titles", value: seo.missingMetaTitle },
-                    { label: "Missing meta descriptions", value: seo.missingMetaDescription },
-                    { label: "Meta description too long or short", value: seo.metaDescriptionTooLong + seo.metaDescriptionTooShort },
-                    { label: "Meta titles over 60 characters", value: seo.metaTitleTooLong },
-                    { label: "Duplicate titles", value: seo.duplicateTitles },
-                    { label: "Main images without alt text", value: seo.missingAlt },
-                  ]}
-                />
-              </Card>
-            </Grid>
-            <Card title="SEO score over time" subtitle="Updated each day the dashboard is opened">
-              <LineChart data={d.history.map((h) => ({ date: h.date, value: h.score }))} />
-            </Card>
-            {seo.worst.length > 0 && (
-              <Card title="Quick wins" subtitle="Pages with the most issues">
-                {seo.worst.map((i, idx) => (
-                  <Row key={i.id} last={idx === seo.worst.length - 1}>
-                    <span style={{ flex: 1 }}>
-                      <s-link href={`shopify:admin/${i.kind === "product" ? "products" : "collections"}/${i.id.split("/").pop()}`}>{i.title}</s-link>
-                      <div style={{ color: palette.muted, fontSize: 12 }}>{i.problems.join(" · ")}</div>
-                    </span>
-                    <Pill tone="warn">{i.problems.length} issue{i.problems.length === 1 ? "" : "s"}</Pill>
-                  </Row>
-                ))}
-              </Card>
-            )}
-          </div>
-        )}
+      <s-section heading="SEO health">
+        <Card>
+          {d.seoScore ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+              <Ring value={d.seoScore.score} label="On-page SEO score" sub={`${d.seoScore.audited - d.seoScore.withIssues} of ${d.seoScore.audited} pages pass every check`} />
+              <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: palette.muted }}>
+                Last checked {fmt(d.seoScore.takenAt)}. Open the <s-link href="/app/seo">SEO tab</s-link> for what needs fixing, the
+                score over time and search opportunities.
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: palette.muted }}>
+              Open the <s-link href="/app/seo">SEO tab</s-link> to run your first on-page SEO check.
+            </div>
+          )}
+        </Card>
       </s-section>
 
       <s-section heading={`What ${b.agency} can see and has done`}>

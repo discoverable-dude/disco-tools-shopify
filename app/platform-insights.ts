@@ -24,6 +24,15 @@ export type PlatformInsights = {
     previous?: { spend: number; revenue?: number };
     daily?: { date: string; spend: number; revenue?: number }[];
   };
+  /** Website traffic (Google Analytics): sessions by channel and new vs returning visitors. */
+  traffic?: {
+    sessions?: number;
+    newUsers?: number;
+    returningUsers?: number;
+    conversionRate?: number;
+    previous?: { sessions: number };
+    channels?: { channel: string; sessions: number; newUsers?: number; returningUsers?: number; conversions?: number; revenue?: number }[];
+  };
   rankings?: {
     tracked: number;
     top3?: number;

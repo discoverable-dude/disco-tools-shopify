@@ -153,13 +153,20 @@ section shows a "will appear here once connected" message.
     "previous": { "spend": 2300, "revenue": 8700 },
     "daily": [{ "date": "2026-11-25", "spend": 80, "revenue": 340 }]
   },
+  "traffic": {
+    "sessions": 18400, "newUsers": 12100, "returningUsers": 4300, "conversionRate": 0.021,
+    "previous": { "sessions": 16900 },
+    "channels": [
+      { "channel": "Organic Search", "sessions": 8200, "newUsers": 5900, "returningUsers": 1800, "conversions": 190, "revenue": 11200 }
+    ]
+  },
   "rankings": {
     "tracked": 120, "top3": 14, "top10": 47,
     "movers": [{ "keyword": "mouse locket", "position": 3, "change": 2 }]
   }
 }
 ```
-`ctr` is a fraction (0.03 = 3%). `change` is positions gained (positive) or lost (negative) versus the previous period.
+`traffic` (Google Analytics, last 30 days) feeds the Customers tab. `ctr` and `conversionRate` are fractions (0.03 = 3%). `change` is positions gained (positive) or lost (negative) versus the previous period.
 
 ### Prompt for Lovable
-> Add a Supabase edge function **`shopify-dashboard`** (`verify_jwt = false`, HMAC-authenticated exactly like `shopify-events`, using `_shared/hmac.ts`). It receives `{ shop }`, looks up `shopify_stores` by `shop_domain` and its linked client, and returns JSON in the shape documented in `docs/PLATFORM_INTEGRATION.md` ("Dashboard data endpoint"), built from the data we already hold for that client: Google Search Console (clicks, impressions, CTR, average position, top queries, top pages, daily clicks, last 30 days vs the previous 30), Google Ads / Meta Ads spend, attributed revenue and ROAS (daily and totals, with previous period), and DiscoRank keyword tracking (tracked, top 3, top 10, biggest movers). Return only the sections that are connected for that client, return `{}` for an unlinked store, never return another client's data, and respond in under 4 seconds (read from pre-aggregated or cached tables, refresh them with a scheduled job). Log nothing sensitive. Then add a small "Shopify dashboard preview" in the client's Shopify tab showing the same JSON so we can check what the store owner will see.
+> Add a Supabase edge function **`shopify-dashboard`** (`verify_jwt = false`, HMAC-authenticated exactly like `shopify-events`, using `_shared/hmac.ts`). It receives `{ shop }`, looks up `shopify_stores` by `shop_domain` and its linked client, and returns JSON in the shape documented in `docs/PLATFORM_INTEGRATION.md` ("Dashboard data endpoint"), built from the data we already hold for that client: Google Search Console (clicks, impressions, CTR, average position, top queries, top pages, daily clicks, last 30 days vs the previous 30), Google Ads / Meta Ads spend, attributed revenue and ROAS (daily and totals, with previous period), and DiscoRank keyword tracking (tracked, top 3, top 10, biggest movers), and GA4 website traffic (sessions, new vs returning users, conversion rate and sessions by default channel group, last 30 days vs the previous 30). Return only the sections that are connected for that client, return `{}` for an unlinked store, never return another client's data, and respond in under 4 seconds (read from pre-aggregated or cached tables, refresh them with a scheduled job). Log nothing sensitive. Then add a small "Shopify dashboard preview" in the client's Shopify tab showing the same JSON so we can check what the store owner will see.
