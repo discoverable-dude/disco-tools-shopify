@@ -38,6 +38,17 @@ Open `https://disco-tools-shopify.vercel.app/admin/clients`, enter the agency pa
 2. In Discoverable Tools: Admin -> Shopify stores -> link the store to the client.
 3. In the app inside Shopify admin open Agency tools (`/app/agency`) and run **Sync products**.
 
+## Creating the apps from the command line (no clicking to create them)
+The CLI can create the apps too, so nothing needs creating in the Dev Dashboard first.
+1. Make a file `clients.json` (git-ignored): `[{ "name": "Acme", "config": "acme", "store": "acme.myshopify.com" }]`. App names are `Discoverable - <name>` and must be 29 characters or fewer, so keep `name` to 14 characters or add an `"appName"` for that client.
+2. Find your organization id in the Dev Dashboard address, `dev.shopify.com/dashboard/<organization-id>`, then run:
+```bash
+npm run clients:create -- clients.json --org <organization-id>
+```
+For each client this creates the app, writes and releases its config, and fetches its Client ID and secret. It is safe to re-run: apps already created are remembered in `clients.created.json`. **Try it with one client first.**
+3. The lines to paste into `/admin/clients` -> **Add several at once** are saved in `clients.register.txt` (it contains secrets and is git-ignored). Delete it once pasted.
+4. Per app in the Dev Dashboard: upload the icon (`public/app-icon-1200.jpg`), enable bulk queries, set the IP allowlist, then Distribution -> Custom distribution -> install link. These have no command-line equivalent.
+
 ## Setting up several clients at once
 For a batch (for example six stores), do the Dev Dashboard parts per app first, then let one command do the terminal work:
 1. In the Dev Dashboard click **Create app**, name each one `Discoverable - ClientName` (29 characters maximum), and copy its **Client ID** and real **Client secret** (`shpss_...`).
