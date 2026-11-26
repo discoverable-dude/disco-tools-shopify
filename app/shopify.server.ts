@@ -2,6 +2,7 @@ import "@shopify/shopify-app-react-router/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
+  LogSeverity,
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
@@ -20,6 +21,10 @@ function build(creds: Creds) {
     apiKey: creds.apiKey,
     apiSecretKey: creds.apiSecret,
     apiVersion: ApiVersion.October26,
+    // Set SHOPIFY_LOG_LEVEL=debug in Vercel to see why a login is rejected.
+    logger: {
+      level: process.env.SHOPIFY_LOG_LEVEL === "debug" ? LogSeverity.Debug : LogSeverity.Info,
+    },
     scopes: process.env.SCOPES?.split(","),
     appUrl: process.env.SHOPIFY_APP_URL || "",
     authPathPrefix: "/auth",
@@ -56,9 +61,12 @@ function instance(creds: Creds): ShopifyApp {
   return app;
 }
 
-const envCreds = (): Creds => ({
-  apiKey: process.env.SHOPIFY_API_KEY || "unconfigured",
-  apiSecret: process.env.SHOPIFY_API_SECRET || "unconfigured",
+// Trim stray spaces, line breaks and quotes that sneak in when pasting values.
+const clean = (v: string | undefined) => (v ?? "").trim().replace(/^["']|["']$/g, "");
+
+export const envCreds = (): Creds => ({
+  apiKey: clean(process.env.SHOPIFY_API_KEY) || "unconfigured",
+  apiSecret: clean(process.env.SHOPIFY_API_SECRET) || "unconfigured",
 });
 
 async function credsForShop(shop: string | null): Promise<Creds> {
@@ -128,9 +136,37 @@ export const apiVersion = ApiVersion.October26;
 export const addDocumentResponseHeaders = (request: Request, headers: Headers) =>
   instance(envCreds()).addDocumentResponseHeaders(request, headers);
 
+/** Log (without tokens) why an authentication call threw, then rethrow unchanged. */
+async function logFailure(label: string, request: Request, error: unknown) {
+  const url = new URL(request.url);
+  const shop = await shopFromRequest(request);
+  const key = (await credsForShop(shop)).apiKey.slice(0, 8);
+  const detail =
+    error instanceof Response
+      ? `status=${error.status} ${error.statusText} retryInvalidSession=${error.headers.get("x-shopify-retry-invalid-session-request")} reauthorize=${error.headers.get("x-shopify-api-request-failure-reauthorize")}`
+      : `error=${(error as Error)?.message}`;
+  console.error(
+    `[auth] ${label} failed ${detail} path=${url.pathname} shop=${shop} key=${key} hasIdToken=${url.searchParams.has("id_token")} hasBearer=${request.headers.has("authorization")} method=${request.method}`,
+  );
+}
+
 export const authenticate = {
-  admin: async (request: Request) => (await appFor(request)).authenticate.admin(request),
-  webhook: async (request: Request) => (await appFor(request)).authenticate.webhook(request),
+  admin: async (request: Request) => {
+    try {
+      return await (await appFor(request)).authenticate.admin(request);
+    } catch (error) {
+      await logFailure("admin", request, error);
+      throw error;
+    }
+  },
+  webhook: async (request: Request) => {
+    try {
+      return await (await appFor(request)).authenticate.webhook(request);
+    } catch (error) {
+      await logFailure("webhook", request, error);
+      throw error;
+    }
+  },
 };
 
 export const unauthenticated = {
