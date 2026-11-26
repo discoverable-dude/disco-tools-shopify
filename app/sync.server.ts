@@ -55,6 +55,11 @@ const CHILD_KEYS: Record<string, string> = {
 };
 
 export async function startSync(admin: Admin, shop: string, resource: Resource, opts: { basic?: boolean } = {}): Promise<Awaited<ReturnType<typeof db.syncRun.create>>> {
+  // A run whose finish webhook never arrived would block every later refresh, so give up on it after 20 minutes.
+  await db.syncRun.updateMany({
+    where: { shop, resource, status: { in: ["running", "delivering"] }, startedAt: { lt: new Date(Date.now() - 20 * 60_000) } },
+    data: { status: "failed", error: "Timed out waiting for Shopify to finish the export", finishedAt: new Date() },
+  });
   const running = await db.syncRun.findFirst({
     where: { shop, resource, status: { in: ["running", "delivering"] } },
   });

@@ -31,9 +31,11 @@ async function state(shop: string, resource: "orders" | "customers", hasData: bo
 /** The saved sales report; refreshes it in the background when older than 12 hours. */
 export async function ordersReport(admin: Admin, shop: string) {
   const saved = await loadSummary(shop);
-  const stale = !saved || Date.now() - saved.computedAt.getTime() > 12 * HOUR;
+  // Reports saved before the tabs existed have no per-product data, so rebuild those straight away.
+  const outdated = Boolean(saved) && saved!.data.products === undefined;
+  const stale = !saved || outdated || Date.now() - saved.computedAt.getTime() > 12 * HOUR;
   if (stale) waitUntil(startSync(admin, shop, "orders").catch((e) => console.error("orders refresh failed", e)));
-  return { data: saved?.data ?? null, updatedAt: saved?.computedAt ?? null, ...(await state(shop, "orders", Boolean(saved))) };
+  return { data: saved?.data ?? null, updatedAt: saved?.computedAt ?? null, ...(await state(shop, "orders", Boolean(saved) && !outdated)) };
 }
 
 /** The saved customer report; refreshes it in the background when older than 24 hours. */
