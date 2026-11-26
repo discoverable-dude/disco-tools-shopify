@@ -49,13 +49,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   ]);
 
   // Prefer the saved report; small stores can use the live numbers until the first report exists.
-  const liveSummary = live.data && !live.data.capped ? liveToSummary(live.data) : null;
+  // While the saved report is being built, busy stores still show the latest orders (clearly
+  // labelled as partial) instead of an empty page.
+  const liveSummary = live.data ? liveToSummary(live.data) : null;
   const salesData = saved?.data ?? liveSummary;
   const sales = {
     data: salesData,
+    partial: !saved && Boolean(live.data?.capped),
     updatedAt: saved?.computedAt ?? null,
-    building: !salesData && (!ordersRun || ordersRun.status === "running" || ordersRun.status === "delivering"),
-    failed: !salesData && ordersRun?.status === "failed",
+    building: !saved && (!ordersRun || ordersRun.status === "running" || ordersRun.status === "delivering"),
+    failed: !saved && ordersRun?.status === "failed",
     error: live.error,
   };
   const shopName: string = (await shopRes.json()).data?.shop?.name ?? shop;
@@ -161,13 +164,20 @@ export default function Dashboard() {
       <s-section heading="Sales overview">
         <div style={{ display: "grid", gap: 14 }}>
           {d.sales.error && !sales && <s-banner tone="critical">Could not load sales: {d.sales.error}</s-banner>}
-          {d.sales.building && (
+          {d.sales.partial && (
+            <s-banner tone={d.sales.failed ? "warning" : "info"} heading={d.sales.failed ? "Showing your latest orders only" : "Building your full sales report"}>
+              {d.sales.failed
+                ? `We couldn't build the full 30-day report just now, so these figures cover only your most recent orders. Your ${b.agency} team can see the reason and will fix it.`
+                : "These figures cover only your most recent orders while we pull the last 60 days to build the full report. It takes a minute or two for busy stores. Refresh shortly."}
+            </s-banner>
+          )}
+          {!d.sales.partial && d.sales.building && (
             <s-banner tone="info" heading="Building your sales report">
               We&apos;re pulling the last 60 days of orders to build an accurate report. It takes a minute or two for busy stores, so
               refresh shortly.
             </s-banner>
           )}
-          {d.sales.failed && (
+          {!d.sales.partial && d.sales.failed && (
             <s-banner tone="warning" heading="Sales report unavailable">
               We couldn&apos;t refresh your sales report just now. Your {b.agency} team can see the reason and will fix it.
             </s-banner>
@@ -175,10 +185,10 @@ export default function Dashboard() {
           {sales && (
             <>
               <Grid min={200}>
-                <Kpi label="Revenue (30 days)" value={money(sales.current.revenue, cur)} delta={<Delta current={sales.current.revenue} previous={sales.previous.revenue} />} />
-                <Kpi label="Orders" value={sales.current.orders.toLocaleString("en-GB")} delta={<Delta current={sales.current.orders} previous={sales.previous.orders} />} accent={palette.teal3} />
-                <Kpi label="Average order value" value={money(aov, cur)} delta={<Delta current={aov} previous={prevAov} />} accent={palette.teal2} />
-                <Kpi label="Refunded" value={money(sales.current.refunded, cur)} delta={<Delta current={sales.current.refunded} previous={sales.previous.refunded} invert />} accent={palette.warn} />
+                <Kpi label={d.sales.partial ? "Revenue (latest orders)" : "Revenue (30 days)"} value={money(sales.current.revenue, cur)} delta={d.sales.partial ? undefined : <Delta current={sales.current.revenue} previous={sales.previous.revenue} />} />
+                <Kpi label="Orders" value={sales.current.orders.toLocaleString("en-GB")} delta={d.sales.partial ? undefined : <Delta current={sales.current.orders} previous={sales.previous.orders} />} accent={palette.teal3} />
+                <Kpi label="Average order value" value={money(aov, cur)} delta={d.sales.partial ? undefined : <Delta current={aov} previous={prevAov} />} accent={palette.teal2} />
+                <Kpi label="Refunded" value={money(sales.current.refunded, cur)} delta={d.sales.partial ? undefined : <Delta current={sales.current.refunded} previous={sales.previous.refunded} invert />} accent={palette.warn} />
               </Grid>
               <Grid min={200}>
                 <Kpi label="Refund rate" value={sales.current.revenue ? pct((sales.current.refunded / sales.current.revenue) * 100) : "0%"} accent={palette.warn} />
@@ -189,7 +199,7 @@ export default function Dashboard() {
                   <Kpi label="Discounts given" value={money(sales.current.discounts, cur)} delta={<span style={{ color: palette.muted, fontSize: 12 }}>{pct((sales.current.discounts / Math.max(gross, 1)) * 100)} of pre-discount sales</span>} accent={palette.teal2} />
                 )}
               </Grid>
-              <Card title="Revenue by day" subtitle={`Last 30 days${sales.from ? `, ${short(sales.from)} to ${short(sales.to)}` : ""}`}>
+              <Card title="Revenue by day" subtitle={d.sales.partial ? "Most recent orders only, full report building" : `Last 30 days${sales.from ? `, ${short(sales.from)} to ${short(sales.to)}` : ""}`}>
                 <BarChart
                   data={sales.daily.map((x) => ({
                     label: short(x.date),
@@ -224,7 +234,7 @@ export default function Dashboard() {
                   />
                 </Card>
               </Grid>
-              <Card title="Best sellers" subtitle="By revenue, last 30 days">
+              <Card title="Best sellers" subtitle={d.sales.partial ? "By revenue, most recent orders" : "By revenue, last 30 days"}>
                 <HBars
                   items={sales.topProducts.map((p) => ({ label: p.title, value: p.revenue, display: `${money(p.revenue, cur)} · ${p.units.toLocaleString("en-GB")} sold` }))}
                   empty="No orders in this period."
