@@ -127,6 +127,7 @@ export async function getSeoAudit(admin: Admin): Promise<SeoAudit> {
 }
 
 type OrderNode = {
+  createdAt: string;
   sourceName: string | null;
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
   totalRefundedSet: { shopMoney: { amount: string } };
@@ -142,26 +143,44 @@ export type OrderInsights = {
   currency: string;
   channels: { name: string; orders: number; revenue: number }[];
   topProducts: { title: string; units: number; revenue: number }[];
+  daily: { date: string; revenue: number; orders: number }[];
+  previous: { orders: number; revenue: number; refunded: number; aov: number };
   capped: boolean;
 };
 
-/** Sales summary for the last 30 days (Shopify exposes 60 days without read_all_orders). */
+/**
+ * Sales summary for the last `days` days plus the `days` before it for comparison. Shopify
+ * exposes 60 days of orders without the read_all_orders scope, so 30 + 30 is the maximum.
+ */
 export async function getOrderInsights(admin: Admin, days = 30): Promise<OrderInsights> {
-  const from = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const dayMs = 86_400_000;
+  const now = Date.now();
+  const currentFrom = now - days * dayMs;
+  const queryFrom = new Date(now - 2 * days * dayMs).toISOString().slice(0, 10);
+
   const insights: OrderInsights = {
-    days, orders: 0, revenue: 0, refunded: 0, aov: 0, currency: "GBP", channels: [], topProducts: [], capped: false,
+    days, orders: 0, revenue: 0, refunded: 0, aov: 0, currency: "GBP",
+    channels: [], topProducts: [], daily: [],
+    previous: { orders: 0, revenue: 0, refunded: 0, aov: 0 },
+    capped: false,
   };
+  const byDay = new Map<string, { revenue: number; orders: number }>();
+  for (let i = days - 1; i >= 0; i--) {
+    byDay.set(new Date(now - i * dayMs).toISOString().slice(0, 10), { revenue: 0, orders: 0 });
+  }
   const channels = new Map<string, { orders: number; revenue: number }>();
   const products = new Map<string, { units: number; revenue: number }>();
+  const MAX_PAGES = 8;
   let after: string | null = null;
 
-  for (let page = 0; page < 4; page++) {
+  for (let page = 0; page < MAX_PAGES; page++) {
     const res: Response = await admin.graphql(
       `#graphql
       query Orders($q: String!, $after: String) {
         orders(first: 100, after: $after, query: $q, sortKey: CREATED_AT, reverse: true) {
           pageInfo { hasNextPage endCursor }
           nodes {
+            createdAt
             sourceName
             totalPriceSet { shopMoney { amount currencyCode } }
             totalRefundedSet { shopMoney { amount } }
@@ -169,16 +188,29 @@ export async function getOrderInsights(admin: Admin, days = 30): Promise<OrderIn
           }
         }
       }`,
-      { variables: { q: `created_at:>=${from}`, after } },
+      { variables: { q: `created_at:>=${queryFrom}`, after } },
     );
     const json = (await res.json()) as { data?: { orders: Page<OrderNode> } };
     const data: Page<OrderNode> | undefined = json.data?.orders;
     for (const o of data?.nodes ?? []) {
       const total = Number(o.totalPriceSet.shopMoney.amount);
+      const refunded = Number(o.totalRefundedSet.shopMoney.amount);
       insights.currency = o.totalPriceSet.shopMoney.currencyCode;
+
+      if (Date.parse(o.createdAt) < currentFrom) {
+        insights.previous.orders++;
+        insights.previous.revenue += total;
+        insights.previous.refunded += refunded;
+        continue;
+      }
       insights.orders++;
       insights.revenue += total;
-      insights.refunded += Number(o.totalRefundedSet.shopMoney.amount);
+      insights.refunded += refunded;
+      const day = byDay.get(o.createdAt.slice(0, 10));
+      if (day) {
+        day.revenue += total;
+        day.orders++;
+      }
       const ch = channels.get(o.sourceName || "unknown") ?? { orders: 0, revenue: 0 };
       ch.orders++;
       ch.revenue += total;
@@ -192,10 +224,12 @@ export async function getOrderInsights(admin: Admin, days = 30): Promise<OrderIn
     }
     if (!data?.pageInfo?.hasNextPage) break;
     after = data.pageInfo.endCursor;
-    if (page === 3) insights.capped = true;
+    if (page === MAX_PAGES - 1) insights.capped = true;
   }
 
   insights.aov = insights.orders ? insights.revenue / insights.orders : 0;
+  insights.previous.aov = insights.previous.orders ? insights.previous.revenue / insights.previous.orders : 0;
+  insights.daily = [...byDay].map(([date, v]) => ({ date, ...v }));
   insights.channels = [...channels].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue);
   insights.topProducts = [...products].map(([title, v]) => ({ title, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
   return insights;

@@ -31,29 +31,36 @@ export function BrandHeader(props: {
   accent: string;
   accentText: string;
   logoUrl: string;
+  title?: string;
   subtitle?: ReactNode;
 }) {
-  const { name, tagline, accent, accentText, logoUrl, subtitle } = props;
+  const { name, tagline, accent, accentText, logoUrl, title, subtitle } = props;
   return (
     <div
       style={{
-        background: accent,
+        background: `radial-gradient(circle at 92% 0%, rgba(95,179,173,0.35) 0, rgba(95,179,173,0) 42%), linear-gradient(120deg, ${accent} 0%, #0b6b66 100%)`,
         color: accentText,
-        borderRadius: 12,
-        padding: "20px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        flexWrap: "wrap",
+        borderRadius: 16,
+        padding: "22px 26px",
+        fontFamily: "Poppins, Inter, system-ui, sans-serif",
       }}
     >
-      {logoUrl ? (
-        <img src={logoUrl} alt={name} style={{ height: 32, width: "auto" }} />
-      ) : (
-        <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>{name}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        {logoUrl ? (
+          <img src={logoUrl} alt={name} style={{ height: 30, width: "auto" }} />
+        ) : (
+          <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>{name}</span>
+        )}
+        <span style={{ opacity: 0.8, fontSize: 13 }}>{tagline}</span>
+        {subtitle && (
+          <span style={{ marginLeft: "auto", fontSize: 12.5, background: "rgba(255,255,255,0.14)", borderRadius: 999, padding: "4px 12px" }}>
+            {subtitle}
+          </span>
+        )}
+      </div>
+      {title && (
+        <div style={{ marginTop: 16, fontSize: 20, fontWeight: 600, letterSpacing: "-0.01em" }}>{title}</div>
       )}
-      <span style={{ opacity: 0.85, fontSize: 14 }}>{tagline}</span>
-      {subtitle && <span style={{ marginLeft: "auto", fontSize: 13, opacity: 0.9 }}>{subtitle}</span>}
     </div>
   );
 }
