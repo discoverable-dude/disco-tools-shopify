@@ -27,6 +27,7 @@ export const SCOPE_INFO: { scope: string; label: string; detail: string; used: b
   { scope: "read_orders", label: "Orders (sales only)", detail: "Order totals, items and sales channel for reporting. Customer names, emails, phone numbers and addresses are never sent to Discoverable.", used: true },
   { scope: "read_customers", label: "Customer totals", detail: "Anonymous customer counts, order counts and spend. No names, emails or addresses are sent to Discoverable.", used: true },
   { scope: "read_inventory", label: "Stock levels", detail: "Know when products go out of stock so reports and ads stay accurate.", used: true },
+  { scope: "read_reports", label: "Store analytics", detail: "Visits, conversion rate and traffic sources from Shopify's own analytics. Totals only, no customer details.", used: true },
   { scope: "read_content", label: "Pages and blog posts", detail: "Reserved for page and blog SEO checks. Not used yet.", used: false },
   { scope: "write_content", label: "Edit pages and blog posts", detail: "Reserved for approved page and blog SEO changes. Not used yet.", used: false },
   { scope: "read_online_store_navigation", label: "Menus and redirects", detail: "Reserved for redirect and navigation checks. Not used yet.", used: false },

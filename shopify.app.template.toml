@@ -7,7 +7,7 @@ application_url = "__APP_URL__"
 embedded = true
 
 [access_scopes]
-scopes = "read_products,write_products,read_orders,read_customers,read_inventory,read_content,write_content,read_online_store_navigation,read_markets"
+scopes = "read_products,write_products,read_orders,read_customers,read_inventory,read_content,write_content,read_online_store_navigation,read_markets,read_reports"
 
 [auth]
 redirect_urls = ["__APP_URL__/auth/callback"]

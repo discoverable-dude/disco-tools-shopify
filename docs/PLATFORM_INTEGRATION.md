@@ -170,3 +170,33 @@ section shows a "will appear here once connected" message.
 
 ### Prompt for Lovable
 > Add a Supabase edge function **`shopify-dashboard`** (`verify_jwt = false`, HMAC-authenticated exactly like `shopify-events`, using `_shared/hmac.ts`). It receives `{ shop }`, looks up `shopify_stores` by `shop_domain` and its linked client, and returns JSON in the shape documented in `docs/PLATFORM_INTEGRATION.md` ("Dashboard data endpoint"), built from the data we already hold for that client: Google Search Console (clicks, impressions, CTR, average position, top queries, top pages, daily clicks, last 30 days vs the previous 30), Google Ads / Meta Ads spend, attributed revenue and ROAS (daily and totals, with previous period), and DiscoRank keyword tracking (tracked, top 3, top 10, biggest movers), and GA4 website traffic (sessions, new vs returning users, conversion rate and sessions by default channel group, last 30 days vs the previous 30). Return only the sections that are connected for that client, return `{}` for an unlinked store, never return another client's data, and respond in under 4 seconds (read from pre-aggregated or cached tables, refresh them with a scheduled job). Log nothing sensitive. Then add a small "Shopify dashboard preview" in the client's Shopify tab showing the same JSON so we can check what the store owner will see.
+
+
+## Shopify visitor data endpoint: `POST {connector}/api/analytics` (visits, conversion rate, traffic sources)
+
+Shopify's own session data (visits, visitors, conversion rate and traffic by referrer source) is not in the
+orders export, so Discoverable Tools asks the Connector for it. It needs the **`read_reports`** access scope on
+the store's app (included in `shopify.app.template.toml`; release a new app version, then the store approves the
+permission update) and Shopify's Level 2 protected customer data access (custom apps already have it).
+
+**Request:** signed like every other call (`x-disco-timestamp`, `x-disco-signature` over `${timestamp}.${rawBody}`),
+body `{ "shop": "store.myshopify.com", "from": "2026-10-28", "to": "2026-11-26" }`. `from` and `to` are optional
+(default: last 30 days), `YYYY-MM-DD` in the store's timezone, and the response includes the previous period of the
+same length.
+
+**Response:**
+```json
+{
+  "ok": true,
+  "period": { "from": "2026-10-28", "to": "2026-11-26" },
+  "current":  { "sessions": 18400, "visitors": 12100, "conversionRate": 0.021, "completedCheckouts": 386 },
+  "previous": { "sessions": 16900, "visitors": 11200, "conversionRate": 0.019, "completedCheckouts": 321 },
+  "daily":   [{ "date": "2026-11-25", "sessions": 610, "visitors": 402, "conversionRate": 0.022 }],
+  "sources": [{ "source": "search", "sessions": 8200, "visitors": 5900, "conversionRate": 0.025, "completedCheckouts": 205 }]
+}
+```
+`conversionRate` is a fraction (0.021 = 2.1%). Bot sessions are excluded. When the permission is not granted yet
+the call returns HTTP 200 `{ "ok": false, "reason": "..." }`, so the report can show "not switched on yet" for that store.
+
+### Prompt for Lovable
+> Where the report currently shows "Visitor numbers aren't flowing yet", call the Connector endpoint **`POST {connector URL}/api/analytics`** for the store, signed exactly like our other Connector calls (`_shared/hmac.ts`, headers `x-disco-timestamp` and `x-disco-signature`). Send `{ shop, from, to }` for the report period. Use `current` and `previous` for visits, visitors and conversion rate (with period-on-period change), `daily` for the trend, and `sources` for traffic sources, and include the same in the email. If the response is `{ ok: false }`, keep the "not switched on yet" message for that store only. Never cache across clients.

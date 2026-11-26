@@ -3,20 +3,24 @@ import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { brand } from "../brand";
-import { ordersReport, customersReport } from "../tab-data.server";
+import { ordersReport, customersReport, safe } from "../tab-data.server";
 import { fetchDashboardInsights } from "../platform.server";
+import { getVisitorAnalytics } from "../analytics.server";
 import { BrandHeader, fmt, money } from "../ui";
 import { Acquisition } from "../acquisition-view";
 import { Card, DataTable, Delta, Grid, HBars, heat, Kpi, Note, palette, StackedBars } from "../charts";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
-  const [orders, customers, platform] = await Promise.all([
+  const to = new Date().toISOString().slice(0, 10);
+  const from = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
+  const [orders, customers, platform, visitors] = await Promise.all([
     ordersReport(admin, session.shop),
     customersReport(admin, session.shop),
     fetchDashboardInsights(session.shop),
+    safe(() => getVisitorAnalytics(admin, from, to)),
   ]);
-  return { orders, customers, traffic: platform?.traffic ?? null, brand: { ...brand } };
+  return { orders, customers, traffic: platform?.traffic ?? null, visitors, brand: { ...brand } };
 };
 
 const pct = (n: number, d = 0) => `${(n * 100).toFixed(d)}%`;
@@ -83,6 +87,36 @@ export default function Customers() {
       )}
 
       {extended && s && (s.acquisition?.length ?? 0) > 0 && <Acquisition rows={s.acquisition ?? []} currency={cur} />}
+
+      {d.visitors.data && (
+        <s-section heading="Visitors and conversion (Shopify, last 30 days)">
+          <Grid min={190}>
+            <Kpi label="Sessions" value={d.visitors.data.current.sessions.toLocaleString("en-GB")} delta={<Delta current={d.visitors.data.current.sessions} previous={d.visitors.data.previous.sessions} />} />
+            <Kpi label="Visitors" value={d.visitors.data.current.visitors.toLocaleString("en-GB")} delta={<Delta current={d.visitors.data.current.visitors} previous={d.visitors.data.previous.visitors} />} accent={palette.teal3} />
+            <Kpi label="Conversion rate" value={pct(d.visitors.data.current.conversionRate, 2)} delta={<Delta current={d.visitors.data.current.conversionRate} previous={d.visitors.data.previous.conversionRate} />} accent={palette.teal2} />
+          </Grid>
+          <div style={{ marginTop: 14 }}>
+            <Card title="Traffic by source" subtitle="Shopify's own visit data">
+              <DataTable
+                rowKey={(r) => r.source}
+                rows={d.visitors.data.sources}
+                columns={[
+                  { label: "Source", render: (r) => r.source },
+                  { label: "Sessions", align: "right", render: (r) => r.sessions.toLocaleString("en-GB") },
+                  { label: "Visitors", align: "right", render: (r) => r.visitors.toLocaleString("en-GB") },
+                  { label: "Conversion", align: "right", render: (r) => pct(r.conversionRate, 2) },
+                  { label: "Orders", align: "right", render: (r) => r.completedCheckouts.toLocaleString("en-GB") },
+                ]}
+              />
+            </Card>
+          </div>
+        </s-section>
+      )}
+      {!d.visitors.data && d.visitors.error && !d.visitors.error.includes("not switched on") && (
+        <div style={{ marginBottom: 16 }}>
+          <Note>Visitor numbers aren&apos;t available yet: {d.visitors.error}.</Note>
+        </div>
+      )}
 
       {t && (t.channels?.length ?? 0) > 0 && (
         <s-section heading={`Website traffic, from ${b.agency}`}>

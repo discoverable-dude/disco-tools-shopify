@@ -26,7 +26,7 @@ npx shopify app deploy --config acme --allow-updates
 Open the new app at dev.shopify.com -> Apps -> the app:
 1. **Settings -> Enable bulk queries** (needed for syncing).
 2. **Settings -> IP allowlist -> Manage**: ASN `16509`, country United Kingdom, run the test, turn on Enforce. (Required before installing on a store outside your organization.)
-3. **Settings -> Protected customer data -> Manage** if you need customer sync (Shopify approves this).
+3. Protected customer data: custom apps built by a partner already have level 1 and level 2 access, so there is normally nothing to request (the **Manage** card under Settings -> Access requests is for public apps). If Shopify rejects the customer fields, the app falls back to a basic export automatically.
 4. **Overview -> Distribution card -> Select distribution method -> Custom distribution**, enter the client's `.myshopify.com` address and click **Generate link**. Choose "limit to a single store" unless the client is a Plus organization with several stores.
 5. Copy the **Client ID** and the **Client secret** from Settings -> Credentials. The secret is behind the eye icon and starts `shpss_`. It is a different, longer value than the Client ID; pasting the Client ID into the secret field makes every login fail with a 401.
 
