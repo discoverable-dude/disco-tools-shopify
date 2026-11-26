@@ -19,7 +19,8 @@
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma migrate deploy && react-router build",
     "client:config": "node scripts/client-config.mjs",
-    "clients:add": "node scripts/add-clients.mjs"
+    "clients:add": "node scripts/add-clients.mjs",
+    "clients:create": "node scripts/create-clients.mjs"
   },
   "type": "module",
   "engines": {

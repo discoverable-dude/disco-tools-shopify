@@ -30,3 +30,11 @@ pnpm-lock.yaml
 .react-router/
 
 .vercel
+
+# Client rollout files (contain client IDs and secrets)
+clients.json
+clients.created.json
+clients.register.txt
+shopify.app.*.toml
+!shopify.app.template.toml
+!shopify.app.toml
