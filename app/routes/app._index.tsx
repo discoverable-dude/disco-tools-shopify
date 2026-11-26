@@ -10,7 +10,7 @@ import { fetchDashboardInsights } from "../platform.server";
 import { hasScope, missingScopes, SCOPE_INFO } from "../scopes.server";
 import { TOPIC_LABELS } from "../labels";
 import { BrandHeader, fmt, money } from "../ui";
-import { BarChart, Card, Delta, Grid, HBars, Kpi, palette, Pill, Ring, Row } from "../charts";
+import { BarChart, Card, Delta, Grid, HBars, Kpi, palette, Pill, Row } from "../charts";
 
 const DAY = 86_400_000;
 
@@ -23,13 +23,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // can use live numbers until the first report exists.
   const report = await ordersReport(admin, shop);
 
-  const [link, shopRes, live, platform, snapshot, byTopic, delivery, runs, pushes] = await Promise.all([
+  const [link, shopRes, live, platform, byTopic, delivery, runs, pushes] = await Promise.all([
     db.shopLink.findUnique({ where: { shop } }),
     admin.graphql(`#graphql
       query ShopName { shop { name } }`),
     report.data ? Promise.resolve({ data: null, error: null }) : safe(() => getOrderInsights(admin)),
     fetchDashboardInsights(shop),
-    db.seoSnapshot.findFirst({ where: { shop }, orderBy: { takenAt: "desc" } }),
     db.webhookEvent.groupBy({ by: ["topic"], where: { shop, receivedAt: { gte: since } }, _count: { _all: true } }),
     db.webhookEvent.groupBy({ by: ["status"], where: { shop, receivedAt: { gte: since } }, _count: { _all: true } }),
     db.syncRun.findMany({ where: { shop, startedAt: { gte: since } }, orderBy: { startedAt: "desc" }, take: 6 }),
@@ -55,7 +54,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shopName,
     link,
     sales,
-    seoScore: snapshot ? { score: snapshot.score, takenAt: snapshot.takenAt, withIssues: snapshot.withIssues, audited: snapshot.audited } : null,
     platform,
     events: byTopic.map((t) => ({ topic: t.topic, count: t._count._all })).sort((a, b) => b.count - a.count),
     delivery: Object.fromEntries(delivery.map((d) => [d.status, d._count._all])) as Record<string, number>,
@@ -292,24 +290,6 @@ export default function Dashboard() {
         )}
       </s-section>
 
-      <s-section heading="SEO health">
-        <Card>
-          {d.seoScore ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
-              <Ring value={d.seoScore.score} label="On-page SEO score" sub={`${d.seoScore.audited - d.seoScore.withIssues} of ${d.seoScore.audited} pages pass every check`} />
-              <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: palette.muted }}>
-                Last checked {fmt(d.seoScore.takenAt)}. Open the <s-link href="/app/seo">SEO tab</s-link> for what needs fixing, the
-                score over time and search opportunities.
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: 13, color: palette.muted }}>
-              Open the <s-link href="/app/seo">SEO tab</s-link> to run your first on-page SEO check.
-            </div>
-          )}
-        </Card>
-      </s-section>
-
       <s-section heading={`What ${b.agency} can see and has done`}>
         <div style={{ display: "grid", gap: 14 }}>
           <Grid min={300}>
@@ -375,8 +355,8 @@ export default function Dashboard() {
       <s-section heading={`Your ${b.agency} team`}>
         <s-stack gap="base">
           <s-text>
-            Traffic, rankings and ad performance for {d.shopName} are reported by {b.agency}. SEO fixes above are applied by
-            your team with a preview and the ability to undo any change.
+            Traffic, rankings and ad performance for {d.shopName} are reported by {b.agency}. Any SEO changes your team makes
+            are applied with a preview and the ability to undo them.
           </s-text>
           <s-stack direction="inline" gap="small">
             {b.bookingUrl && <s-button href={b.bookingUrl} target="_blank" variant="primary">Book a call</s-button>}
