@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SalesAggregator } from "../app/sales-summary.server";
 import { CustomerAggregator } from "../app/customer-summary.server";
+import { tableRows } from "../app/analytics.server";
 import { byMonth, filterRows, matrix, monthsOf, newShare, totals } from "../app/acquisition";
 import { forecastStock, profitability, velocity } from "../app/forecast";
 
@@ -137,4 +138,11 @@ test("acquisition filters, monthly split and matrix", () => {
   assert.equal(byChannel[0].months["2026-10"].newOrders, 2);
   assert.equal(newShare(byChannel[1].total), 0);
   assert.ok(Math.abs(newShare(byChannel[0].total) - 3 / 7) < 1e-9);
+});
+
+test("ShopifyQL table rows work as objects or arrays", () => {
+  const cols = [{ name: "referrer_source" }, { name: "sessions" }];
+  assert.deepEqual(tableRows({ columns: cols, rows: [["search", 10]] }), [{ referrer_source: "search", sessions: 10 }]);
+  assert.deepEqual(tableRows({ columns: cols, rows: [{ referrer_source: "direct", sessions: "4" }] }), [{ referrer_source: "direct", sessions: "4" }]);
+  assert.deepEqual(tableRows(null), []);
 });
