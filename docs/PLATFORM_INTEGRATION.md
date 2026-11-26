@@ -124,3 +124,42 @@ Returns `{ dryRun: true, previous, changes }` for a preview, or `{ ok: true, aud
 2. Client (or you, as collaborator) approves the install.
 3. In Discoverable Tools, link the new store to the client (or set it in the connector dashboard).
 4. Run a full sync of products, collections and orders.
+
+---
+
+## Dashboard data endpoint: `shopify-dashboard` (search, ads and rankings in the Shopify dashboard)
+
+The Connector's dashboard inside each client's Shopify admin shows a "Search and ads" section. It calls one
+Supabase edge function per page load (6 second timeout, so cache aggressively). Until the function exists the
+section shows a "will appear here once connected" message.
+
+**Request:** `POST {DISCO_TOOLS_API_URL}/shopify-dashboard`, signed like every other call (`x-disco-timestamp`,
+`x-disco-signature` over `${timestamp}.${rawBody}`), body `{ "shop": "store.myshopify.com" }`.
+
+**Response (JSON, every section optional, omit what is not connected for that client):**
+```json
+{
+  "updatedAt": "2026-11-26T04:00:00Z",
+  "period": { "from": "2026-10-28", "to": "2026-11-26" },
+  "organic": {
+    "clicks": 1840, "impressions": 61200, "ctr": 0.030, "position": 14.2,
+    "previous": { "clicks": 1510, "impressions": 55800 },
+    "daily": [{ "date": "2026-11-25", "clicks": 62, "impressions": 2100 }],
+    "topQueries": [{ "query": "blackberry locket", "clicks": 120, "impressions": 3400, "position": 4.1 }],
+    "topPages": [{ "url": "https://store.com/products/blackberry-mouse-locket", "clicks": 210 }]
+  },
+  "paid": {
+    "currency": "GBP", "spend": 2450, "revenue": 9800, "roas": 4.0, "clicks": 3100,
+    "previous": { "spend": 2300, "revenue": 8700 },
+    "daily": [{ "date": "2026-11-25", "spend": 80, "revenue": 340 }]
+  },
+  "rankings": {
+    "tracked": 120, "top3": 14, "top10": 47,
+    "movers": [{ "keyword": "mouse locket", "position": 3, "change": 2 }]
+  }
+}
+```
+`ctr` is a fraction (0.03 = 3%). `change` is positions gained (positive) or lost (negative) versus the previous period.
+
+### Prompt for Lovable
+> Add a Supabase edge function **`shopify-dashboard`** (`verify_jwt = false`, HMAC-authenticated exactly like `shopify-events`, using `_shared/hmac.ts`). It receives `{ shop }`, looks up `shopify_stores` by `shop_domain` and its linked client, and returns JSON in the shape documented in `docs/PLATFORM_INTEGRATION.md` ("Dashboard data endpoint"), built from the data we already hold for that client: Google Search Console (clicks, impressions, CTR, average position, top queries, top pages, daily clicks, last 30 days vs the previous 30), Google Ads / Meta Ads spend, attributed revenue and ROAS (daily and totals, with previous period), and DiscoRank keyword tracking (tracked, top 3, top 10, biggest movers). Return only the sections that are connected for that client, return `{}` for an unlinked store, never return another client's data, and respond in under 4 seconds (read from pre-aggregated or cached tables, refresh them with a scheduled job). Log nothing sensitive. Then add a small "Shopify dashboard preview" in the client's Shopify tab showing the same JSON so we can check what the store owner will see.

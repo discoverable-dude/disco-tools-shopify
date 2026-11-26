@@ -1,0 +1,4 @@
+[
+  { "name": "Acme Garden", "config": "acme", "clientId": "paste-the-32-character-client-id-here" },
+  { "name": "Bill Skinner", "config": "billskinner", "clientId": "paste-the-32-character-client-id-here" }
+]
