@@ -38,3 +38,4 @@ clients.register.txt
 shopify.app.*.toml
 !shopify.app.template.toml
 !shopify.app.toml
+clients.create.*.log

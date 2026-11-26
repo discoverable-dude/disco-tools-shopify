@@ -46,6 +46,7 @@ The CLI can create the apps too, so nothing needs creating in the Dev Dashboard 
 npm run clients:create -- clients.json --org <organization-id>
 ```
 For each client this creates the app, writes and releases its config, and fetches its Client ID and secret. It is safe to re-run: apps already created are remembered in `clients.created.json`. **Try it with one client first.**
+   If an app already exists in the Dev Dashboard (for example from an earlier attempt), add its Client ID to that client in `clients.json` as `"clientId": "..."`. The command then skips creating it and only links, configures, releases and fetches the secret. If creating fails, the CLI's full output is saved in `clients.create.<config>.log`.
 3. The lines to paste into `/admin/clients` -> **Add several at once** are saved in `clients.register.txt` (it contains secrets and is git-ignored). Delete it once pasted.
 4. Per app in the Dev Dashboard: upload the icon (`public/app-icon-1200.jpg`), enable bulk queries, set the IP allowlist, then Distribution -> Custom distribution -> install link. These have no command-line equivalent.
 

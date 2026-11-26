@@ -34,6 +34,10 @@ const createdFile = "clients.created.json";
 const created = existsSync(createdFile) ? JSON.parse(readFileSync(createdFile, "utf8")) : {};
 const registerFile = "clients.register.txt"; // contains secrets, git-ignored
 
+// The CLI mixes one-line JSON progress events with the final result, in any order, so find the
+// client ID by pattern instead of assuming where the result sits.
+const findClientId = (text) => text.match(/"clientId"\s*:\s*"([0-9a-zA-Z]{16,})"/)?.[1];
+
 const lastJson = (text) => {
   // CLI output may contain log lines; take the last JSON object.
   for (let i = text.lastIndexOf("{"); i >= 0; i = text.lastIndexOf("{", i - 1)) {
@@ -64,26 +68,30 @@ const results = [];
 for (const c of clients) {
   const appName = c.appName || `Discoverable - ${c.name}`;
   console.log(`\n=== ${appName} (${c.store}) ===`);
-  let clientId = created[c.config]?.clientId;
+  // An app that already exists can be given as "clientId" in clients.json (nothing is created).
+  let clientId = c.clientId || created[c.config]?.clientId;
   let failed = null;
 
-  // 1. Create the app (skipped when it already exists from an earlier run)
+  // 1. Create the app (skipped when it already exists)
   if (!clientId) {
     const dir = mkdtempSync(join(tmpdir(), "disco-app-"));
     const r = shopify(["app", "init", "--name", appName, "--organization-id", org, "--template", "none", "--no-input", "--json", "--path", dir]);
     rmSync(dir, { recursive: true, force: true });
-    const out = lastJson(`${r.stdout ?? ""}\n${r.stderr ?? ""}`);
-    clientId = out?.app?.clientId;
-    if (r.status !== 0 || !clientId) {
-      console.error((r.stderr || r.stdout || "").slice(-800));
+    const all = `${r.stdout ?? ""}\n${r.stderr ?? ""}`;
+    writeFileSync(`clients.create.${c.config}.log`, all);
+    clientId = findClientId(all);
+    if (!clientId) {
+      console.error(`Could not find the new app's client ID (exit code ${r.status}). Full output saved to clients.create.${c.config}.log`);
+      console.error("Check the Dev Dashboard: if the app exists, copy its Client ID into clients.json as \"clientId\" and run again.");
       failed = "create";
     } else {
+      if (r.status !== 0) console.warn(`Warning: the CLI exited with code ${r.status} but the app was created.`);
       created[c.config] = { name: appName, store: c.store, clientId };
       writeFileSync(createdFile, JSON.stringify(created, null, 2));
       console.log(`Created app, client ID ${clientId}`);
     }
   } else {
-    console.log(`App already created (client ID ${clientId}), continuing`);
+    console.log(`Using existing app, client ID ${clientId}`);
   }
 
   // 2. Link, configure and release
