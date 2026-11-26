@@ -34,7 +34,7 @@ for (const c of clients) {
   const steps = [
     ["link", () => run("npx", ["shopify", "app", "config", "link", "--client-id", c.clientId, "--file-name", `shopify.app.${c.config}.toml`, "--force", "--no-input"])],
     ["config", () => run("node", ["scripts/client-config.mjs", c.config, "--name", appName])],
-    ["deploy", () => run("npx", ["shopify", "app", "deploy", "--config", c.config, "--force"])],
+    ["deploy", () => run("npx", ["shopify", "app", "deploy", "--config", c.config, "--allow-updates"])],
   ];
   let failed = null;
   for (const [label, fn] of steps) {

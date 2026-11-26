@@ -19,7 +19,7 @@ npm run client:config -- acme --name "Discoverable - Acme"
 This rewrites `shopify.app.acme.toml` with the standard scopes, webhooks and the Connector address.
 
 ```bash
-npx shopify app deploy --config acme --force
+npx shopify app deploy --config acme --allow-updates
 ```
 
 ## 2. Set up the app in the Dev Dashboard

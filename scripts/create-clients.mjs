@@ -100,7 +100,7 @@ for (const c of clients) {
     : [
         ["link", () => inherit(bin[0], [...bin.slice(1), "app", "config", "link", "--client-id", clientId, "--file-name", `shopify.app.${c.config}.toml`, "--force", "--no-input"])],
         ["config", () => inherit("node", ["scripts/client-config.mjs", c.config, "--name", appName])],
-        ["deploy", () => inherit(bin[0], [...bin.slice(1), "app", "deploy", "--config", c.config, "--force"])],
+        ["deploy", () => inherit(bin[0], [...bin.slice(1), "app", "deploy", "--config", c.config, "--allow-updates"])],
       ];
   for (const [label, fn] of steps) {
     if (fn().status !== 0) {
