@@ -22,7 +22,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const [link, shopRes, sales, seo] = await Promise.all([
     db.shopLink.findUnique({ where: { shop: session.shop } }),
-    admin.graphql(`#graphql query { shop { name } }`),
+    admin.graphql(`#graphql
+      query ShopName { shop { name } }`),
     safe(() => getOrderInsights(admin)),
     safe(() => getSeoAudit(admin)),
   ]);

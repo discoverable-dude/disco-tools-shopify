@@ -138,6 +138,8 @@ export const addDocumentResponseHeaders = (request: Request, headers: Headers) =
 
 /** Log (without tokens) why an authentication call threw, then rethrow unchanged. */
 async function logFailure(label: string, request: Request, error: unknown) {
+  // 302 / 410 are Shopify's normal "get a fresh session token" redirects, not failures.
+  if (error instanceof Response && (error.status === 302 || error.status === 410)) return;
   const url = new URL(request.url);
   const shop = await shopFromRequest(request);
   const key = (await credsForShop(shop)).apiKey.slice(0, 8);
