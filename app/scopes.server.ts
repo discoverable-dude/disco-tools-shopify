@@ -37,18 +37,3 @@ export const SCOPE_INFO: { scope: string; label: string; detail: string; used: b
 export function hasScope(granted: string[], scope: string) {
   return granted.includes(scope) || (scope.startsWith("read_") && granted.includes(scope.replace("read_", "write_")));
 }
-
-/** Friendly names for webhook topics. */
-export const TOPIC_LABELS: Record<string, string> = {
-  PRODUCTS_CREATE: "New products",
-  PRODUCTS_UPDATE: "Product changes",
-  PRODUCTS_DELETE: "Products removed",
-  COLLECTIONS_CREATE: "New collections",
-  COLLECTIONS_UPDATE: "Collection changes",
-  COLLECTIONS_DELETE: "Collections removed",
-  ORDERS_CREATE: "New orders",
-  ORDERS_UPDATED: "Order updates",
-  CUSTOMERS_CREATE: "New customers (totals only)",
-  CUSTOMERS_UPDATE: "Customer total updates",
-  INVENTORY_LEVELS_UPDATE: "Stock level changes",
-};
