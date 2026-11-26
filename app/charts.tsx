@@ -140,8 +140,8 @@ export function BarChart(props: {
                 {d.label}
               </text>
             ))
-          : [0, Math.floor((data.length - 1) / 2), data.length - 1].map((i, k) => (
-              <text key={k} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"} fill={palette.muted}>
+          : [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])].map((i, k, arr) => (
+              <text key={k} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor={k === 0 ? "start" : k === arr.length - 1 ? "end" : "middle"} fill={palette.muted}>
                 {data[i].label}
               </text>
             )))}
@@ -312,8 +312,8 @@ export function StackedBars(props: {
           );
         })}
         {data.length > 0 &&
-          [0, Math.floor((data.length - 1) / 2), data.length - 1].map((i, k) => (
-            <text key={k} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"} fill={palette.muted}>
+          [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])].map((i, k, arr) => (
+            <text key={k} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor={k === 0 ? "start" : k === arr.length - 1 ? "end" : "middle"} fill={palette.muted}>
               {data[i].label}
             </text>
           ))}

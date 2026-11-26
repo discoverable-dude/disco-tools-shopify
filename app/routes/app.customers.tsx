@@ -6,6 +6,7 @@ import { brand } from "../brand";
 import { ordersReport, customersReport } from "../tab-data.server";
 import { fetchDashboardInsights } from "../platform.server";
 import { BrandHeader, fmt, money } from "../ui";
+import { Acquisition } from "../acquisition-view";
 import { Card, DataTable, Delta, Grid, HBars, heat, Kpi, Note, palette, StackedBars } from "../charts";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -81,27 +82,7 @@ export default function Customers() {
         </s-section>
       )}
 
-      {extended && s && (s.traffic?.length ?? 0) > 0 && (
-        <s-section heading="Where orders come from (Shopify attribution)">
-          <Grid min={320}>
-            <Card title="Revenue by channel" subtitle="Last visit before the order, last 30 days">
-              <HBars items={(s.traffic ?? []).slice(0, 8).map((x) => ({ label: x.name, value: x.revenue, display: money(x.revenue, cur) }))} />
-            </Card>
-            <Card title="Top sources" subtitle="New customers acquired per source">
-              <DataTable
-                rowKey={(r) => r.name}
-                rows={(s.sources ?? []).slice(0, 8)}
-                columns={[
-                  { label: "Source", render: (r) => <span>{r.name}<span style={{ color: palette.muted }}> · {r.channel}</span></span> },
-                  { label: "Orders", align: "right", render: (r) => r.orders },
-                  { label: "New", align: "right", render: (r) => r.newOrders },
-                  { label: "Revenue", align: "right", render: (r) => money(r.revenue, cur) },
-                ]}
-              />
-            </Card>
-          </Grid>
-        </s-section>
-      )}
+      {extended && s && (s.acquisition?.length ?? 0) > 0 && <Acquisition rows={s.acquisition ?? []} currency={cur} />}
 
       {t && (t.channels?.length ?? 0) > 0 && (
         <s-section heading={`Website traffic, from ${b.agency}`}>

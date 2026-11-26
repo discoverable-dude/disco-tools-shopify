@@ -8,10 +8,12 @@ type Admin = Awaited<ReturnType<typeof authenticate.admin>>["admin"];
 export type Resource = "products" | "orders" | "customers";
 
 // Bulk query bodies. Keep fields lean; add more as the platform needs them.
-// Orders are limited to the last 60 days (Shopify's window without read_all_orders), which is
-// also what the 30 + 30 day sales report needs.
+// Orders are limited to the last 60 days by default (Shopify's window without read_all_orders), which is
+// also what the 30 + 30 day sales report needs. Set ORDERS_EXPORT_DAYS (up to 400) for apps that have
+// the read_all_orders scope and need longer monthly history; stores without it still return 60 days.
+const exportDays = () => Math.min(400, Math.max(60, Number(process.env.ORDERS_EXPORT_DAYS) || 60));
 const ordersQuery = (extended: boolean) => {
-  const from = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+  const from = new Date(Date.now() - exportDays() * 86_400_000).toISOString().slice(0, 10);
   // "Extended" adds the customer id and the visits before purchase, which give new vs returning
   // customers and traffic sources. If Shopify refuses them for a store, a basic export is used.
   const journey = extended

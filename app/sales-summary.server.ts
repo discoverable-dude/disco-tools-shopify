@@ -3,6 +3,8 @@ import db from "./db.server";
 const DAY = 86_400_000;
 
 export type Totals = { orders: number; revenue: number; refunded: number; discounts: number; units: number };
+/** n/r/u = orders from new / returning / unknown customers; nv/rv/uv = their revenue. */
+export type AcquisitionRow = { d: string; c: string; s: string; n: number; r: number; u: number; nv: number; rv: number; uv: number };
 export type Segment = { orders: number; revenue: number };
 
 export type SalesSummaryData = {
@@ -29,6 +31,8 @@ export type SalesSummaryData = {
   sources?: { name: string; channel: string; orders: number; revenue: number; newOrders: number }[];
   /** Units sold per product, for stock forecasting. */
   products?: { id: string; title: string; u30: number; u14: number; revenue: number }[];
+  /** Orders per day, channel and source, split new / returning / unknown, over the whole export window. */
+  acquisition?: AcquisitionRow[];
   /** Units and discounted revenue per variant, for margin. */
   variants?: { id: string; productId: string; title: string; units: number; revenue: number }[];
 };
@@ -89,6 +93,7 @@ export class SalesAggregator {
   private sources = new Map<string, { channel: string; orders: number; revenue: number; newOrders: number }>();
   private productUnits = new Map<string, { title: string; u30: number; u14: number; revenue: number }>();
   private variantUnits = new Map<string, { productId: string; title: string; units: number; revenue: number }>();
+  private acq = new Map<string, AcquisitionRow>();
   private currentFrom: number;
   private recentFrom: number;
   private sawJourney = false;
@@ -116,6 +121,17 @@ export class SalesAggregator {
     if ("customerJourneySummary" in o) this.sawJourney = true;
     const idx = Number(o.customerJourneySummary?.customerOrderIndex);
     const kind: "new" | "returning" | "unknown" = Number.isFinite(idx) && idx >= 1 ? (idx === 1 ? "new" : "returning") : "unknown";
+
+    if (this.sawJourney) {
+      const a = attribution(o);
+      const d = o.createdAt.slice(0, 10);
+      const key = `${d}|${a.channel}|${a.source}`;
+      const row = this.acq.get(key) ?? { d, c: a.channel, s: a.source, n: 0, r: 0, u: 0, nv: 0, rv: 0, uv: 0 };
+      if (kind === "new") { row.n++; row.nv += total; }
+      else if (kind === "returning") { row.r++; row.rv += total; }
+      else { row.u++; row.uv += total; }
+      this.acq.set(key, row);
+    }
 
     if (t < this.currentFrom) {
       if (t >= this.currentFrom - this.days * DAY) {
@@ -197,6 +213,22 @@ export class SalesAggregator {
     }
   }
 
+  /** Keeps the 30 busiest sources; the long tail is folded into "other" within its channel. */
+  private acquisitionRows(): AcquisitionRow[] {
+    const byRevenue = new Map<string, number>();
+    for (const r of this.acq.values()) byRevenue.set(r.s, (byRevenue.get(r.s) ?? 0) + r.nv + r.rv + r.uv);
+    const keep = new Set([...byRevenue].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([s]) => s));
+    const out = new Map<string, AcquisitionRow>();
+    for (const r of this.acq.values()) {
+      const source = keep.has(r.s) ? r.s : "other";
+      const key = `${r.d}|${r.c}|${source}`;
+      const row = out.get(key);
+      if (!row) out.set(key, { ...r, s: source });
+      else for (const k of ["n", "r", "u", "nv", "rv", "uv"] as const) row[k] += r[k];
+    }
+    return [...out.values()].sort((a, b) => a.d.localeCompare(b.d));
+  }
+
   result(): SalesSummaryData {
     const dates = [...this.byDay.keys()];
     return {
@@ -214,6 +246,7 @@ export class SalesAggregator {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 8),
       extended: this.sawJourney,
+      acquisition: this.acquisitionRows(),
       segments: this.segCur,
       previousSegments: this.segPrev,
       dailySegments: [...this.byDay].map(([date, v]) => ({ date, newRevenue: v.newRevenue, returningRevenue: v.returningRevenue })),

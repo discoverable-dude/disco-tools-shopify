@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SalesAggregator } from "../app/sales-summary.server";
 import { CustomerAggregator } from "../app/customer-summary.server";
+import { byMonth, filterRows, matrix, monthsOf, newShare, totals } from "../app/acquisition";
 import { forecastStock, profitability, velocity } from "../app/forecast";
 
 const NOW = Date.parse("2026-11-26T12:00:00Z");
@@ -105,4 +106,35 @@ test("profitability: costed vs missing, coverage and margin", () => {
   assert.equal(p.missingCost[0].title, "Hat");
   assert.ok(Math.abs(p.coverage - 150 / 200) < 1e-9);
   assert.ok(Math.abs(p.margin - 0.6) < 1e-9);
+});
+
+test("acquisition rows: per day, channel and source, split new / returning", () => {
+  const r = sample();
+  const acq = r.acquisition!;
+  const g = acq.find((x) => x.s === "google")!;
+  assert.deepEqual([g.c, g.n, g.r, g.nv], ["Organic", 1, 0, 100]);
+  const nl = acq.find((x) => x.s === "newsletter")!;
+  assert.deepEqual([nl.n, nl.r, nl.rv], [0, 1, 60]);
+  // orders older than the 30 day window are still counted (the export covers 60 days)
+  assert.equal(totals(acq).returningOrders, 2);
+});
+
+test("acquisition filters, monthly split and matrix", () => {
+  const rows = [
+    { d: "2026-10-30", c: "Organic", s: "google", n: 2, r: 1, u: 0, nv: 100, rv: 40, uv: 0 },
+    { d: "2026-11-02", c: "Organic", s: "google", n: 1, r: 3, u: 0, nv: 50, rv: 150, uv: 0 },
+    { d: "2026-11-03", c: "Email", s: "newsletter", n: 0, r: 4, u: 0, nv: 0, rv: 200, uv: 0 },
+  ];
+  assert.deepEqual(monthsOf(rows), ["2026-10", "2026-11"]);
+  assert.equal(filterRows(rows, { from: "2026-11-01" }).length, 2);
+  assert.equal(filterRows(rows, { channel: "Organic", to: "2026-10-31" }).length, 1);
+  assert.equal(filterRows(rows, { source: "newsletter" })[0].c, "Email");
+  const m = byMonth(rows);
+  assert.deepEqual(m.map((x) => [x.month, x.cell.newOrders, x.cell.returningOrders]), [["2026-10", 2, 1], ["2026-11", 1, 7]]);
+  const byChannel = matrix(rows, "channel");
+  assert.deepEqual(byChannel.map((x) => x.key), ["Organic", "Email"]); // Organic has 340 revenue, Email 200
+  assert.equal(byChannel[0].months["2026-11"].returningOrders, 3);
+  assert.equal(byChannel[0].months["2026-10"].newOrders, 2);
+  assert.equal(newShare(byChannel[1].total), 0);
+  assert.ok(Math.abs(newShare(byChannel[0].total) - 3 / 7) < 1e-9);
 });
