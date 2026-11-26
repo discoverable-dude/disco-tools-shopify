@@ -38,7 +38,7 @@ export async function credentialsForShop(shop: string): Promise<Creds | null> {
   if (hit && Date.now() - hit.at < TTL_MS) return hit.creds;
 
   const row = await db.appCredential.findUnique({ where: { shop: s } });
-  const creds = row ? { apiKey: row.clientId, apiSecret: decrypt(row.clientSecretEnc) } : null;
+  const creds = row ? { apiKey: row.clientId.trim(), apiSecret: decrypt(row.clientSecretEnc).trim() } : null;
   cache.set(s, { creds, at: Date.now() });
   return creds;
 }
