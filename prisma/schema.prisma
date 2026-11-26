@@ -69,6 +69,7 @@ model SyncRun {
   status      String    @default("running") // running | delivering | completed | failed
   recordCount Int       @default(0)
   error       String?
+  variant     String? // "basic" when the export fell back to a reduced set of fields
   startedAt   DateTime  @default(now())
   finishedAt  DateTime?
 
@@ -124,4 +125,11 @@ model SalesSummary {
   shop       String   @id
   computedAt DateTime @default(now())
   payload    String // JSON, see app/sales-summary.server.ts
+}
+
+// Customer base report (cohorts, lifetime value, repeat rate) built from the bulk customers export.
+model CustomerSummary {
+  shop       String   @id
+  computedAt DateTime @default(now())
+  payload    String // JSON, see app/customer-summary.server.ts
 }

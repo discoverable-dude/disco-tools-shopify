@@ -282,3 +282,44 @@ export function liveToSummary(o: OrderInsights): import("./sales-summary.server"
     topProducts: o.topProducts,
   };
 }
+
+export type StockProduct = { id: string; title: string; inventory: number; tracked: boolean };
+
+/** Active products with their total stock, for stock forecasting (up to 1,000 products). */
+export async function getStockProducts(admin: Admin): Promise<StockProduct[]> {
+  const { nodes } = await pageAll<{ id: string; title: string; totalInventory: number; tracksInventory: boolean }>(
+    admin,
+    "products",
+    "id title totalInventory tracksInventory",
+  );
+  return nodes.map((n) => ({ id: n.id, title: n.title, inventory: n.totalInventory, tracked: n.tracksInventory }));
+}
+
+export type VariantCost = { price: number; cost: number | null };
+
+/** Selling price and unit cost per variant (cost is null when it has not been entered in Shopify). */
+export async function getVariantCosts(admin: Admin, ids: string[]): Promise<Record<string, VariantCost>> {
+  const out: Record<string, VariantCost> = {};
+  for (let i = 0; i < ids.length; i += 100) {
+    const res: Response = await admin.graphql(
+      `#graphql
+      query VariantCosts($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on ProductVariant { id price inventoryItem { unitCost { amount } } }
+        }
+      }`,
+      { variables: { ids: ids.slice(i, i + 100) } },
+    );
+    const json = (await res.json()) as {
+      data?: { nodes: ({ id: string; price: string; inventoryItem?: { unitCost?: { amount?: string } | null } | null } | null)[] };
+      errors?: { message: string }[];
+    };
+    if (!json.data) throw new Error(json.errors?.[0]?.message ?? "Cost query failed");
+    for (const n of json.data.nodes) {
+      if (!n) continue;
+      const c = n.inventoryItem?.unitCost?.amount;
+      out[n.id] = { price: Number(n.price) || 0, cost: c !== undefined && c !== null && c !== "" ? Number(c) : null };
+    }
+  }
+  return out;
+}
