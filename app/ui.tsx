@@ -42,6 +42,7 @@ export function BrandHeader(props: {
         color: accentText,
         borderRadius: 16,
         padding: "22px 26px",
+        marginBottom: 16,
         fontFamily: "Poppins, Inter, system-ui, sans-serif",
       }}
     >

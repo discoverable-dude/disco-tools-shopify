@@ -99,8 +99,9 @@ export function BarChart(props: {
   format?: (n: number) => string;
   color?: string;
   height?: number;
+  allLabels?: boolean;
 }) {
-  const { data, format = (n) => String(Math.round(n)), color = palette.teal2, height = 170 } = props;
+  const { data, format = (n) => String(Math.round(n)), color = palette.teal2, height = 170, allLabels = false } = props;
   const W = 640;
   const padL = 44;
   const padB = 22;
@@ -133,11 +134,17 @@ export function BarChart(props: {
         );
       })}
       {data.length > 0 &&
-        [0, Math.floor((data.length - 1) / 2), data.length - 1].map((i, k) => (
-          <text key={k} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"} fill={palette.muted}>
-            {data[i].label}
-          </text>
-        ))}
+        (allLabels
+          ? data.map((d, i) => (
+              <text key={i} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor="middle" fill={palette.muted}>
+                {d.label}
+              </text>
+            ))
+          : [0, Math.floor((data.length - 1) / 2), data.length - 1].map((i, k) => (
+              <text key={k} x={padL + i * slot + slot / 2} y={height - 6} fontSize={10} textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"} fill={palette.muted}>
+                {data[i].label}
+              </text>
+            )))}
       {total === 0 && (
         <text x={(W + padL) / 2} y={height / 2} textAnchor="middle" fontSize={12} fill={palette.muted}>
           No data in this period
@@ -147,7 +154,7 @@ export function BarChart(props: {
   );
 }
 
-export function LineChart(props: { data: { date: string; value: number }[]; color?: string; height?: number; min?: number; max?: number }) {
+export function LineChart(props: { data: { date: string; value: number }[]; color?: string; height?: number; min?: number; max?: number; empty?: string }) {
   const { data, color = palette.teal2, height = 150, min = 0, max = 100 } = props;
   const W = 640;
   const padL = 34;
@@ -156,7 +163,7 @@ export function LineChart(props: { data: { date: string; value: number }[]; colo
   if (data.length < 2) {
     return (
       <div style={{ color: palette.muted, fontSize: 13, padding: "24px 0", textAlign: "center", fontFamily: font }}>
-        History builds up daily. Check back tomorrow to see your progress.
+        {props.empty ?? "History builds up daily. Check back tomorrow to see your progress."}
       </div>
     );
   }

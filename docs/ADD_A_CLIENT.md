@@ -38,6 +38,18 @@ Open `https://disco-tools-shopify.vercel.app/admin/clients`, enter the agency pa
 2. In Discoverable Tools: Admin -> Shopify stores -> link the store to the client.
 3. In the app inside Shopify admin open Agency tools (`/app/agency`) and run **Sync products**.
 
+## Setting up several clients at once
+For a batch (for example six stores), do the Dev Dashboard parts per app first, then let one command do the terminal work:
+1. In the Dev Dashboard click **Create app**, name each one `Discoverable - ClientName` (29 characters maximum), and copy its **Client ID** and real **Client secret** (`shpss_...`).
+2. Copy `clients.example.json` to `clients.json` and fill in each client's name, a short config name and the Client ID. Then run:
+```bash
+npm run clients:add -- clients.json
+```
+This links each app, writes its config from the template and deploys and releases it, then prints a summary.
+3. Per app in the Dev Dashboard: enable bulk queries, set the IP allowlist, then Distribution -> Custom distribution -> install link.
+4. Open `/admin/clients`, use **Add several at once**, and paste one line per client: `store.myshopify.com, clientId, clientSecret, Client name`.
+5. Send the install links, link each store in Discoverable Tools, and check `/api/diagnose?shop=<store>` for each.
+
 ## One-off setup (already done once)
 In Vercel set `APP_ENCRYPTION_KEY` (openssl rand -hex 32), `AGENCY_PASSCODE`, `DATABASE_URL`, `DATABASE_URL_UNPOOLED`,
 `DISCO_TOOLS_API_URL`, `DISCO_TOOLS_API_SECRET`, `SHOPIFY_APP_URL`, `SCOPES`. `SHOPIFY_API_KEY` and

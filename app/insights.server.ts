@@ -234,3 +234,51 @@ export async function getOrderInsights(admin: Admin, days = 30): Promise<OrderIn
   insights.topProducts = [...products].map(([title, v]) => ({ title, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
   return insights;
 }
+
+export type StockAlerts = {
+  outOfStock: number;
+  lowStock: number;
+  examples: { id: string; title: string }[];
+};
+
+/** Live products that are sold out or nearly sold out. Uses Shopify's product search filters. */
+export async function getStockAlerts(admin: Admin): Promise<StockAlerts> {
+  const res: Response = await admin.graphql(
+    `#graphql
+    query StockAlerts {
+      out: productsCount(query: "status:active AND inventory_total:<=0") { count }
+      low: productsCount(query: "status:active AND inventory_total:>0 AND inventory_total:<=5") { count }
+      examples: products(first: 6, query: "status:active AND inventory_total:<=0", sortKey: UPDATED_AT, reverse: true) {
+        nodes { id title }
+      }
+    }`,
+  );
+  const json = (await res.json()) as {
+    data?: { out: { count: number }; low: { count: number }; examples: { nodes: { id: string; title: string }[] } };
+    errors?: { message: string }[];
+  };
+  if (!json.data) throw new Error(json.errors?.[0]?.message ?? "Stock query failed");
+  return { outOfStock: json.data.out.count, lowStock: json.data.low.count, examples: json.data.examples.nodes };
+}
+
+/** Convert the live (small store) sales result into the same shape as the saved report. */
+export function liveToSummary(o: OrderInsights): import("./sales-summary.server").SalesSummaryData {
+  const weekday = Array.from({ length: 7 }, (_, day) => ({ day, orders: 0, revenue: 0 }));
+  for (const d of o.daily) {
+    const w = weekday[(new Date(d.date).getUTCDay() + 6) % 7];
+    w.orders += d.orders;
+    w.revenue += d.revenue;
+  }
+  return {
+    currency: o.currency,
+    from: o.daily[0]?.date ?? "",
+    to: o.daily[o.daily.length - 1]?.date ?? "",
+    days: o.days,
+    current: { orders: o.orders, revenue: o.revenue, refunded: o.refunded, discounts: 0, units: 0 },
+    previous: { orders: o.previous.orders, revenue: o.previous.revenue, refunded: o.previous.refunded, discounts: 0, units: 0 },
+    daily: o.daily,
+    weekday,
+    channels: o.channels,
+    topProducts: o.topProducts,
+  };
+}

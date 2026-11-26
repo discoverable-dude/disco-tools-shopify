@@ -1,11 +1,27 @@
 import db from "./db.server";
 import { authenticate, unauthenticated } from "./shopify.server";
 import { sendBatch } from "./platform.server";
+import { SalesAggregator, saveSummary } from "./sales-summary.server";
 
 type Admin = Awaited<ReturnType<typeof authenticate.admin>>["admin"];
 export type Resource = "products" | "orders" | "customers";
 
 // Bulk query bodies. Keep fields lean; add more as the platform needs them.
+// Orders are limited to the last 60 days (Shopify's window without read_all_orders), which is
+// also what the 30 + 30 day sales report needs.
+const ordersQuery = () => {
+  const from = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+  return `{ orders(query: "created_at:>=${from}") { edges { node {
+    id name createdAt processedAt displayFinancialStatus displayFulfillmentStatus
+    currencyCode sourceName
+    totalPriceSet { shopMoney { amount currencyCode } }
+    subtotalPriceSet { shopMoney { amount } }
+    totalDiscountsSet { shopMoney { amount } }
+    totalRefundedSet { shopMoney { amount } }
+    lineItems { edges { node { id title quantity sku originalTotalSet { shopMoney { amount } } product { id } } } }
+  } } } }`;
+};
+
 const QUERIES: Record<Resource, string> = {
   products: `{ products { edges { node {
     id title handle status vendor productType tags updatedAt onlineStoreUrl
@@ -14,15 +30,7 @@ const QUERIES: Record<Resource, string> = {
     variants { edges { node { id sku price inventoryQuantity } } }
     collections { edges { node { id handle } } }
   } } } }`,
-  orders: `{ orders { edges { node {
-    id name createdAt processedAt displayFinancialStatus displayFulfillmentStatus
-    currencyCode sourceName
-    totalPriceSet { shopMoney { amount currencyCode } }
-    subtotalPriceSet { shopMoney { amount } }
-    totalDiscountsSet { shopMoney { amount } }
-    totalRefundedSet { shopMoney { amount } }
-    lineItems { edges { node { id title quantity sku product { id } } } }
-  } } } }`,
+  orders: "",
   customers: `{ customers { edges { node {
     id createdAt updatedAt numberOfOrders state
     amountSpent { amount currencyCode }
@@ -49,7 +57,7 @@ export async function startSync(admin: Admin, shop: string, resource: Resource) 
         userErrors { field message }
       }
     }`,
-    { variables: { q: QUERIES[resource] } },
+    { variables: { q: resource === "orders" ? ordersQuery() : QUERIES[resource] } },
   );
   const json = await res.json();
   const result = json.data?.bulkOperationRunQuery;
@@ -84,6 +92,7 @@ export async function finishSync(shop: string, bulkOpId: string, status: string)
     const url: string | null = (await res.json()).data?.node?.url ?? null;
 
     let count = 0;
+    const sales = run.resource === "orders" ? new SalesAggregator(30) : null;
     if (url) {
       // Stream JSONL; each line is a node, children carry __parentId.
       const file = await fetch(url);
@@ -104,7 +113,10 @@ export async function finishSync(shop: string, bulkOpId: string, status: string)
         const row = JSON.parse(line) as Record<string, unknown>;
         const parentId = row.__parentId as string | undefined;
         if (!parentId) {
-          if (current) batch.push(current);
+          if (current) {
+            batch.push(current);
+            sales?.add(current);
+          }
           current = row;
           if (batch.length >= 500) await flush();
           return;
@@ -123,10 +135,14 @@ export async function finishSync(shop: string, bulkOpId: string, status: string)
         for (const line of lines) if (line.trim()) await handle(line);
         if (done) break;
       }
-      if (current) batch.push(current);
+      if (current) {
+        batch.push(current);
+        sales?.add(current);
+      }
       await flush();
     }
     await sendBatch(shop, run.resource, run.id, [], true);
+    if (sales) await saveSummary(shop, sales.result());
 
     await db.syncRun.update({
       where: { id: run.id },

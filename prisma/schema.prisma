@@ -117,3 +117,11 @@ model SeoSnapshot {
 
   @@index([shop, takenAt])
 }
+
+// Pre-computed 30 + 30 day sales report per store, built from the bulk orders export so it
+// is accurate for stores with thousands of orders (live paging can only cover the latest few hundred).
+model SalesSummary {
+  shop       String   @id
+  computedAt DateTime @default(now())
+  payload    String // JSON, see app/sales-summary.server.ts
+}

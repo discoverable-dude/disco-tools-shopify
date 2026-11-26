@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { PlatformInsights } from "./platform-insights";
 
 /**
  * Client for the Discoverable Tools platform API.
@@ -70,6 +71,25 @@ export const sendBatch = (
   final: boolean,
 ) =>
   platformPost("/shopify-sync", { shop, resource, runId, records, final });
+
+/** Search, ads and ranking data for a store from Discoverable Tools. Null when not available. */
+export async function fetchDashboardInsights(shop: string): Promise<PlatformInsights | null> {
+  if (!platformConfigured()) return null;
+  try {
+    const body = JSON.stringify({ shop });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const res = await fetch(`${baseUrl()}/shopify-dashboard`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-disco-timestamp": timestamp, "x-disco-signature": sign(body, timestamp) },
+      body,
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as PlatformInsights;
+  } catch {
+    return null;
+  }
+}
 
 /** Ping used by the admin UI to show connection health. */
 export async function platformHealth(): Promise<{ ok: boolean; detail: string }> {

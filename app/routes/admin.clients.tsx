@@ -35,6 +35,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (!clientId || !secret) throw new Error("Client ID and client secret are both required");
       await saveCredential(shop, clientId, secret, String(form.get("label") || ""));
       notice = `Saved credentials for ${shop}`;
+    } else if (intent === "bulk") {
+      // One client per line: store.myshopify.com, clientId, clientSecret[, label]
+      const lines = String(form.get("lines") || "").split("\n").map((l) => l.trim()).filter(Boolean);
+      const done: string[] = [];
+      const bad: string[] = [];
+      for (const line of lines) {
+        const [shop, clientId, secret, ...label] = line.split(",").map((x) => x.trim());
+        if (!shop || !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i.test(shop) || !clientId || !secret) {
+          bad.push(shop || line.slice(0, 30));
+          continue;
+        }
+        await saveCredential(shop, clientId, secret, label.join(", "));
+        done.push(shop);
+      }
+      notice = `Saved ${done.length} app${done.length === 1 ? "" : "s"}${bad.length ? `. Skipped ${bad.length} line(s) that were not valid: ${bad.join(", ")}` : ""}`;
     } else if (intent === "delete") {
       await deleteCredential(String(form.get("shop") || ""));
       notice = "Removed";
@@ -86,6 +101,23 @@ export default function AdminClients() {
               <label>Client secret<input style={input} type="password" name="clientSecret" required autoComplete="off" /></label>
               <label>Label (optional)<input style={input} name="label" placeholder="Client name" /></label>
               <button style={button} type="submit">Save</button>
+            </Form>
+          </section>
+
+          <section style={card}>
+            <h2 style={{ marginTop: 0 }}>Add several at once</h2>
+            <p style={{ marginTop: 0, color: "#555", fontSize: 14 }}>One per line: store address, Client ID, Client secret, optional label.</p>
+            <Form method="post">
+              <input type="hidden" name="intent" value="bulk" />
+              <input type="hidden" name="passcode" value={passcode} />
+              <textarea
+                name="lines"
+                rows={6}
+                autoComplete="off"
+                placeholder="client-store.myshopify.com, 32-char-client-id, shpss_secret, Client name"
+                style={{ ...input, fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              />
+              <button style={button} type="submit">Save all</button>
             </Form>
           </section>
 
