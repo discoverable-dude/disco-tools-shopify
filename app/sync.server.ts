@@ -29,9 +29,13 @@ const ordersQuery = (extended: boolean) => {
     totalDiscountsSet { shopMoney { amount } }
     totalRefundedSet { shopMoney { amount } }
     ${journey}
-    lineItems { edges { node { id title quantity sku
-      originalTotalSet { shopMoney { amount } } discountedTotalSet { shopMoney { amount } }
-      product { id } variant { id } } } }
+    lineItems { edges { node { id title quantity currentQuantity sku
+      originalTotalSet { shopMoney { amount } }
+      originalUnitPriceSet { shopMoney { amount currencyCode } }
+      totalDiscountSet { shopMoney { amount currencyCode } }
+      discountedTotalSet { shopMoney { amount currencyCode } }
+      product { id }
+      variant { id inventoryItem { unitCost { amount currencyCode } } } } } }
   } } } }`;
 };
 
@@ -40,7 +44,7 @@ const QUERIES: Record<Resource, string> = {
     id title handle status vendor productType tags updatedAt onlineStoreUrl
     seo { title description }
     featuredMedia { ... on MediaImage { alt image { url } } }
-    variants { edges { node { id sku price inventoryQuantity } } }
+    variants { edges { node { id sku price inventoryQuantity inventoryItem { unitCost { amount currencyCode } } } } }
     collections { edges { node { id handle } } }
   } } } }`,
   orders: "",

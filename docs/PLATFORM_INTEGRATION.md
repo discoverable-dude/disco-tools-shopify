@@ -200,3 +200,12 @@ the call returns HTTP 200 `{ "ok": false, "reason": "..." }`, so the report can 
 
 ### Prompt for Lovable
 > Where the report currently shows "Visitor numbers aren't flowing yet", call the Connector endpoint **`POST {connector URL}/api/analytics`** for the store, signed exactly like our other Connector calls (`_shared/hmac.ts`, headers `x-disco-timestamp` and `x-disco-signature`). Send `{ shop, from, to }` for the report period. Use `current` and `previous` for visits, visitors and conversion rate (with period-on-period change), `daily` for the trend, and `sources` for traffic sources, and include the same in the email. If the response is `{ ok: false }`, keep the "not switched on yet" message for that store only. Never cache across clients.
+
+
+## Product costs and line prices (for margin in Discoverable Tools)
+The bulk `orders` export now includes, on every line item: `currentQuantity`, `originalUnitPriceSet`, `totalDiscountSet`,
+`discountedTotalSet`, `product { id }` and `variant { id inventoryItem { unitCost { amount currencyCode } } }`. The bulk
+`products` export includes `inventoryItem { unitCost }` on every variant. Shopify only holds the variant's *current*
+cost, not the cost at the time of sale, so store the cost on each line as it arrives. Needs `read_products`,
+`read_orders` and `read_inventory`, which every app already has. After deploying, run a full orders and products sync
+for every store to backfill history (Agency tools in each store, or `POST /api/sync` from the platform).
